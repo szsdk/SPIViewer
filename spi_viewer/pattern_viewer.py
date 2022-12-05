@@ -5,8 +5,6 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 import matplotlib.pyplot as plt
 
-# pg.setConfigOptions(antialias=True)
-
 __all__ = [
     "PatternDataModel",
     "PatternViewer",
@@ -87,6 +85,7 @@ class PatternViewer(QtWidgets.QWidget):
         )
         self._dm.selected.connect(self.updateImage)
         self._dm.selectedListChanged.connect(self.updatePatternRange)
+        self._imageInit = True
         self.updatePatternRange()
         self.updateRotation(self.rotation)
 
@@ -108,10 +107,10 @@ class PatternViewer(QtWidgets.QWidget):
     def initUI(self):
         grid = QtWidgets.QGridLayout()
         self.imageViewer = pg.ImageView()
-        grid.addWidget(self.imageViewer, 0, 0)
+        grid.addWidget(self.imageViewer, 0, 0, 1, 2)
 
         self.indexGroup = QtWidgets.QGroupBox("Index")
-        grid.addWidget(self.indexGroup, 1, 0)
+        grid.addWidget(self.indexGroup, 1, 0, 1, 2)
 
         hbox = QtWidgets.QHBoxLayout()
         self.indexGroup.setLayout(hbox)
@@ -127,14 +126,18 @@ class PatternViewer(QtWidgets.QWidget):
         self.rotationSlider.setMaximum(359)
         self.rotationSlider.setValue(0)
         self.rotationSlider.valueChanged.connect(self.updateRotation)
-        grid.addWidget(self.rotationSlider, 2, 0)
+        grid.addWidget(self.rotationSlider, 2, 1)
+        grid.addWidget(QtWidgets.QLabel("rotation"), 2, 0)
 
         self.colormapBox = QtWidgets.QComboBox(parent=self)
         self.colormapBox.addItems(plt.colormaps())
         self.colormapBox.currentTextChanged.connect(
             lambda cm: self.imageViewer.setColorMap(pg.colormap.getFromMatplotlib(cm))
         )
-        grid.addWidget(self.colormapBox, 3, 0)
+        self.colormapBox.setCurrentText("magma")
+        self.colormapBox.currentTextChanged.emit("magma")
+        grid.addWidget(QtWidgets.QLabel("colormap"), 3, 0)
+        grid.addWidget(self.colormapBox, 3, 1)
 
         self.setLayout(grid)
 
@@ -145,14 +148,6 @@ class PatternViewer(QtWidgets.QWidget):
         self.patternSlider.setMaximum(numData - 1)
         self.patternNumberLabel.setText(f"/{numData}")
         self.patternSlider.setValue(0)
-
-    def _patternSelectSpinBoxValueChanged(self, v):
-        print("CP0", v)
-        self.patternSlider.setValue(v)
-
-    def _patternSliderValueChanged(self, v):
-        print("CP1", v)
-        self.patternSelectSpinBox.setValue(v)
 
     def updateRotation(self, angle):
         self.rotation = angle
@@ -165,5 +160,17 @@ class PatternViewer(QtWidgets.QWidget):
         tr.rotate(self.rotation)
         tr.scale((x1 - x0) / sx, (y1 - y0) / sy)
         tr.translate(x0 - 0.5, y0 - 0.5)
-        self.indexGroup.setTitle(f"{rawIndex:06d}/{self._dm.pattern2DDet.num_data:06d}")
-        self.imageViewer.setImage(img, transform=tr, autoRange=False)
+        self.indexGroup.setTitle(
+            f"index: {rawIndex:06d}/{self._dm.pattern2DDet.num_data:06d} sum:{img.sum()}"
+        )
+        if self._imageInit:
+            self.imageViewer.setImage(img, transform=tr)
+            self._imageInit = False
+        else:
+            self.imageViewer.setImage(
+                img,
+                transform=tr,
+                autoRange=False,
+                autoHistogramRange=False,
+                autoLevels=False,
+            )
