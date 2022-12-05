@@ -12,26 +12,52 @@ __all__ = [
     "PatternViewer",
 ]
 
+
 class PatternDataModel(QtCore.QObject):
     selected = QtCore.pyqtSignal(int, np.ndarray)
     selectedListChanged = QtCore.pyqtSignal()
+
     def __init__(self, patterns2DDet, initIndex=0, selectedList=None):
         super().__init__()
         self.pattern2DDet = patterns2DDet
         self._cache = cachetools.LRUCache(maxsize=32)
         self._idx = initIndex
-        # self.updateSelectedList(selectedList)
-        self.selectedList = np.arange(self.pattern2DDet.num_data) if selectedList is None else selectedList
+        self.selectedList = (
+            np.arange(self.pattern2DDet.num_data)
+            if selectedList is None
+            else selectedList
+        )
+        self._protectIdx = False
 
     def updateSelectedList(self, selectedList):
-        self.selectedList = np.arange(self.pattern2DDet.num_data) if selectedList is None else selectedList
+        self.selectedList = (
+            np.arange(self.pattern2DDet.num_data)
+            if selectedList is None
+            else selectedList
+        )
         self.selectedListChanged.emit()
         self.select(0)
 
+    @property
+    def index(self):
+        return self._idx
 
     def select(self, idx: int):
+        if self._protectIdx:
+            return
+        self._protectIdx = True
         self._idx = idx
         self.selected.emit(*self.getSelection())
+        self._protectIdx = False
+
+    def selectNext(self):
+        self.select((self.index + 1) % len(self))
+
+    def selectPrevious(self):
+        self.select((self.index - 1) % len(self))
+
+    def selectRandomly(self):
+        self.select(np.random.choice(len(self)))
 
     def getSelection(self):
         rawIndex = int(self.selectedList[self._idx])
@@ -44,33 +70,53 @@ class PatternDataModel(QtCore.QObject):
     def __len__(self):
         return len(self.selectedList)
 
+
 class PatternViewer(QtWidgets.QWidget):
     def __init__(self, dataModel, parent=None):
         super().__init__(parent=parent)
         self.rotation = 0
         self.initUI()
-        self._dm = dataModel # data model
+        self._dm = dataModel  # data model
         self.patternSelectSpinBox.valueChanged.connect(self._dm.select)
+        self.patternSlider.valueChanged.connect(self._dm.select)
+        self._dm.selected.connect(
+            lambda a, b: self.patternSelectSpinBox.setValue(self._dm.index)
+        )
+        self._dm.selected.connect(
+            lambda a, b: self.patternSlider.setValue(self._dm.index)
+        )
         self._dm.selected.connect(self.updateImage)
         self._dm.selectedListChanged.connect(self.updatePatternRange)
         self.updatePatternRange()
         self.updateRotation(self.rotation)
-        self._protectPatternIndex = False
+
+    def keyPressEvent(self, event):
+        event.accept()
+        if event.key() == QtCore.Qt.Key_N:
+            self._dm.selectNext()
+        elif event.key() == QtCore.Qt.Key_P:
+            self._dm.selectPrevious()
+        elif event.key() == QtCore.Qt.Key_R:
+            self._dm.selectRandomly()
+        elif event.key() == QtCore.Qt.Key_A:
+            self.rotationSlider.setValue((self.rotationSlider.value() - 1) % 360)
+        elif event.key() == QtCore.Qt.Key_S:
+            self.rotationSlider.setValue((self.rotationSlider.value() + 1) % 360)
+        else:
+            event.ignore()
 
     def initUI(self):
-        grid = QtWidgets.QGridLayout()  
+        grid = QtWidgets.QGridLayout()
         self.imageViewer = pg.ImageView()
         grid.addWidget(self.imageViewer, 0, 0)
 
         self.indexGroup = QtWidgets.QGroupBox("Index")
         grid.addWidget(self.indexGroup, 1, 0)
-                
+
         hbox = QtWidgets.QHBoxLayout()
         self.indexGroup.setLayout(hbox)
         self.patternSelectSpinBox = QtWidgets.QSpinBox(self)
         self.patternSlider = QtWidgets.QSlider(QtCore.Qt.Horizontal, parent=self)
-        self.patternSelectSpinBox.valueChanged.connect(self._patternSelectSpinBoxValueChanged)
-        self.patternSlider.valueChanged.connect(self._patternSliderValueChanged)
         self.patternNumberLabel = QtWidgets.QLabel()
         hbox.addWidget(self.patternSelectSpinBox)
         hbox.addWidget(self.patternNumberLabel)
@@ -93,30 +139,20 @@ class PatternViewer(QtWidgets.QWidget):
         self.setLayout(grid)
 
     def updatePatternRange(self):
-        # self._dm.updateSelectedList(selectedList)
         numData = len(self._dm)
-        self.patternSelectSpinBox.setRange(0, numData-1)
+        self.patternSelectSpinBox.setRange(0, numData - 1)
         self.patternSlider.setMinimum(0)
-        self.patternSlider.setMaximum(numData-1)
+        self.patternSlider.setMaximum(numData - 1)
         self.patternNumberLabel.setText(f"/{numData}")
         self.patternSlider.setValue(0)
 
     def _patternSelectSpinBoxValueChanged(self, v):
-        if self._protectPatternIndex:
-            return
         print("CP0", v)
-        self._protectPatternIndex = True
         self.patternSlider.setValue(v)
-        self._protectPatternIndex = False
 
     def _patternSliderValueChanged(self, v):
-        if self._protectPatternIndex:
-            return
         print("CP1", v)
-        self._protectPatternIndex = True
         self.patternSelectSpinBox.setValue(v)
-        self._protectPatternIndex = False
-
 
     def updateRotation(self, angle):
         self.rotation = angle
@@ -129,6 +165,5 @@ class PatternViewer(QtWidgets.QWidget):
         tr.rotate(self.rotation)
         tr.scale((x1 - x0) / sx, (y1 - y0) / sy)
         tr.translate(x0 - 0.5, y0 - 0.5)
-        # print(rawIndex)
-        self.indexGroup.setTitle(f"{rawIndex:06d}")
+        self.indexGroup.setTitle(f"{rawIndex:06d}/{self._dm.pattern2DDet.num_data:06d}")
         self.imageViewer.setImage(img, transform=tr, autoRange=False)
