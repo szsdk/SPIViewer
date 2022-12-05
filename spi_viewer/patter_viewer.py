@@ -14,12 +14,20 @@ __all__ = [
 
 class PatternDataModel(QtCore.QObject):
     selected = QtCore.pyqtSignal(int, np.ndarray)
+    selectedListChanged = QtCore.pyqtSignal()
     def __init__(self, patterns2DDet, initIndex=0, selectedList=None):
         super().__init__()
         self.pattern2DDet = patterns2DDet
-        self.selectedList = np.arange(self.pattern2DDet.num_data) if selectedList is None else selectedList
         self._cache = cachetools.LRUCache(maxsize=32)
         self._idx = initIndex
+        # self.updateSelectedList(selectedList)
+        self.selectedList = np.arange(self.pattern2DDet.num_data) if selectedList is None else selectedList
+
+    def updateSelectedList(self, selectedList):
+        self.selectedList = np.arange(self.pattern2DDet.num_data) if selectedList is None else selectedList
+        self.selectedListChanged.emit()
+        self.select(0)
+
 
     def select(self, idx: int):
         self._idx = idx
@@ -41,8 +49,13 @@ class PatternViewer(QtWidgets.QWidget):
         super().__init__(parent=parent)
         self.rotation = 0
         self.initUI()
-        self.updateDataModel(dataModel)
+        self._dm = dataModel # data model
+        self.patternSelectSpinBox.valueChanged.connect(self._dm.select)
+        self._dm.selected.connect(self.updateImage)
+        self._dm.selectedListChanged.connect(self.updatePatternRange)
+        self.updatePatternRange()
         self.updateRotation(self.rotation)
+        self._protectPatternIndex = False
 
     def initUI(self):
         grid = QtWidgets.QGridLayout()  
@@ -56,6 +69,8 @@ class PatternViewer(QtWidgets.QWidget):
         self.indexGroup.setLayout(hbox)
         self.patternSelectSpinBox = QtWidgets.QSpinBox(self)
         self.patternSlider = QtWidgets.QSlider(QtCore.Qt.Horizontal, parent=self)
+        self.patternSelectSpinBox.valueChanged.connect(self._patternSelectSpinBoxValueChanged)
+        self.patternSlider.valueChanged.connect(self._patternSliderValueChanged)
         self.patternNumberLabel = QtWidgets.QLabel()
         hbox.addWidget(self.patternSelectSpinBox)
         hbox.addWidget(self.patternNumberLabel)
@@ -77,18 +92,31 @@ class PatternViewer(QtWidgets.QWidget):
 
         self.setLayout(grid)
 
-    def updateDataModel(self, dataModel):
-        self._dm = dataModel # data model
+    def updatePatternRange(self):
+        # self._dm.updateSelectedList(selectedList)
         numData = len(self._dm)
         self.patternSelectSpinBox.setRange(0, numData-1)
-        self.patternSelectSpinBox.valueChanged.connect(self._dm.select)
-        self._dm.selected.connect(self.updateImage)
         self.patternSlider.setMinimum(0)
         self.patternSlider.setMaximum(numData-1)
         self.patternNumberLabel.setText(f"/{numData}")
         self.patternSlider.setValue(0)
-        self.patternSelectSpinBox.valueChanged.connect(self.patternSlider.setValue)
-        self.patternSlider.valueChanged.connect(self.patternSelectSpinBox.setValue)
+
+    def _patternSelectSpinBoxValueChanged(self, v):
+        if self._protectPatternIndex:
+            return
+        print("CP0", v)
+        self._protectPatternIndex = True
+        self.patternSlider.setValue(v)
+        self._protectPatternIndex = False
+
+    def _patternSliderValueChanged(self, v):
+        if self._protectPatternIndex:
+            return
+        print("CP1", v)
+        self._protectPatternIndex = True
+        self.patternSelectSpinBox.setValue(v)
+        self._protectPatternIndex = False
+
 
     def updateRotation(self, angle):
         self.rotation = angle
