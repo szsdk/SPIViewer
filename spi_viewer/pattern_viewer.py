@@ -4,6 +4,7 @@ import cachetools
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 import matplotlib.pyplot as plt
+from . import utils
 
 __all__ = [
     "PatternDataModel",
@@ -20,19 +21,13 @@ class PatternDataModel(QtCore.QObject):
         self.pattern2DDet = patterns2DDet
         self._cache = cachetools.LRUCache(maxsize=32)
         self._idx = initIndex
-        self.selectedList = (
-            np.arange(self.pattern2DDet.num_data)
-            if selectedList is None
-            else selectedList
-        )
+        self.selectedList = (np.arange(self.pattern2DDet.num_data)
+                             if selectedList is None else selectedList)
         self._protectIdx = False
 
     def updateSelectedList(self, selectedList):
-        self.selectedList = (
-            np.arange(self.pattern2DDet.num_data)
-            if selectedList is None
-            else selectedList
-        )
+        self.selectedList = (np.arange(self.pattern2DDet.num_data)
+                             if selectedList is None else selectedList)
         self.selectedListChanged.emit()
         self.select(0)
 
@@ -48,11 +43,11 @@ class PatternDataModel(QtCore.QObject):
         self.selected.emit(*self.getSelection())
         self._protectIdx = False
 
-    def selectNext(self):
-        self.select((self.index + 1) % len(self))
+    def selectNext(self, d: int = 1):
+        self.select((self.index + d) % len(self))
 
-    def selectPrevious(self):
-        self.select((self.index - 1) % len(self))
+    def selectPrevious(self, d: int = 1):
+        self.select((self.index - d) % len(self))
 
     def selectRandomly(self):
         self.select(np.random.choice(len(self)))
@@ -78,29 +73,37 @@ class PatternViewer(QtWidgets.QWidget):
         self.patternSelectSpinBox.valueChanged.connect(self._dm.select)
         self.patternSlider.valueChanged.connect(self._dm.select)
         self._dm.selected.connect(
-            lambda a, b: self.patternSelectSpinBox.setValue(self._dm.index)
-        )
+            lambda a, b: self.patternSelectSpinBox.setValue(self._dm.index))
         self._dm.selected.connect(
-            lambda a, b: self.patternSlider.setValue(self._dm.index)
-        )
+            lambda a, b: self.patternSlider.setValue(self._dm.index))
         self._dm.selected.connect(self.updateImage)
         self._dm.selectedListChanged.connect(self.updatePatternRange)
         self._imageInit = True
         self.updatePatternRange()
         self.updateRotation(self.rotation)
+        self._gears = {
+            QtCore.Qt.Key_N: utils.Gear([100, 10, 1], [0.1, 0.5]),
+            QtCore.Qt.Key_P: utils.Gear([100, 10, 1], [0.1, 0.5]),
+            QtCore.Qt.Key_A: utils.Gear([5, 1], [0.2]),
+            QtCore.Qt.Key_S: utils.Gear([5, 1], [0.2]),
+        }
 
     def keyPressEvent(self, event):
         event.accept()
         if event.key() == QtCore.Qt.Key_N:
-            self._dm.selectNext()
+            self._dm.selectNext(d=self._gears[QtCore.Qt.Key_N].getSpeed())
         elif event.key() == QtCore.Qt.Key_P:
-            self._dm.selectPrevious()
+            self._dm.selectPrevious(d=self._gears[QtCore.Qt.Key_N].getSpeed())
         elif event.key() == QtCore.Qt.Key_R:
             self._dm.selectRandomly()
         elif event.key() == QtCore.Qt.Key_A:
-            self.rotationSlider.setValue((self.rotationSlider.value() - 1) % 360)
+            d = self._gears[QtCore.Qt.Key_A].getSpeed()
+            self.rotationSlider.setValue(
+                (self.rotationSlider.value() - d) % 360)
         elif event.key() == QtCore.Qt.Key_S:
-            self.rotationSlider.setValue((self.rotationSlider.value() + 1) % 360)
+            d = self._gears[QtCore.Qt.Key_S].getSpeed()
+            self.rotationSlider.setValue(
+                (self.rotationSlider.value() + d) % 360)
         else:
             event.ignore()
 
@@ -115,13 +118,15 @@ class PatternViewer(QtWidgets.QWidget):
         hbox = QtWidgets.QHBoxLayout()
         self.indexGroup.setLayout(hbox)
         self.patternSelectSpinBox = QtWidgets.QSpinBox(self)
-        self.patternSlider = QtWidgets.QSlider(QtCore.Qt.Horizontal, parent=self)
+        self.patternSlider = QtWidgets.QSlider(QtCore.Qt.Horizontal,
+                                               parent=self)
         self.patternNumberLabel = QtWidgets.QLabel()
         hbox.addWidget(self.patternSelectSpinBox)
         hbox.addWidget(self.patternNumberLabel)
         hbox.addWidget(self.patternSlider)
 
-        self.rotationSlider = QtWidgets.QSlider(QtCore.Qt.Horizontal, parent=self)
+        self.rotationSlider = QtWidgets.QSlider(QtCore.Qt.Horizontal,
+                                                parent=self)
         self.rotationSlider.setMinimum(0)
         self.rotationSlider.setMaximum(359)
         self.rotationSlider.setValue(0)
@@ -132,8 +137,8 @@ class PatternViewer(QtWidgets.QWidget):
         self.colormapBox = QtWidgets.QComboBox(parent=self)
         self.colormapBox.addItems(plt.colormaps())
         self.colormapBox.currentTextChanged.connect(
-            lambda cm: self.imageViewer.setColorMap(pg.colormap.getFromMatplotlib(cm))
-        )
+            lambda cm: self.imageViewer.setColorMap(
+                pg.colormap.getFromMatplotlib(cm)))
         self.colormapBox.setCurrentText("magma")
         self.colormapBox.currentTextChanged.emit("magma")
         grid.addWidget(QtWidgets.QLabel("colormap"), 3, 0)
