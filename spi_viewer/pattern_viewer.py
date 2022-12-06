@@ -41,7 +41,6 @@ class PatternDataModel(QtCore.QObject):
         self.patterns = patterns
         self.detector = detector
         self.detectorRender = None
-        # self.pattern2DDet = patterns2DDet
         self.symmetrize = False
         self._cache = cachetools.LRUCache(maxsize=32)
         self._idx = initIndex
@@ -103,7 +102,7 @@ class PatternDataModel(QtCore.QObject):
             if self.detectorRender is None:
                 return (img + img[::-1, ::-1]) / 2
             else:
-                return self.detectorRender.render(np.concatenate([img] * 2))
+                return self.detectorRender.render(np.concatenate([img] * 2), intensity=True)
 
     def __len__(self):
         return len(self.selectedList)
@@ -177,8 +176,6 @@ class PatternViewer(QtWidgets.QWidget):
         self.rotationSlider.setMaximum(359)
         self.rotationSlider.setValue(0)
         self.rotationSlider.valueChanged.connect(self.updateRotation)
-        # grid.addWidget(self.rotationSlider, 2, 1)
-        # grid.addWidget(QtWidgets.QLabel("rotation"), 2, 0)
         igLayout.addWidget(QtWidgets.QLabel("rotation"), 0, 0)
         igLayout.addWidget(self.rotationSlider, 0, 1, 1, 2)
 
@@ -203,9 +200,6 @@ class PatternViewer(QtWidgets.QWidget):
         self.imageGroup.setLayout(igLayout)
         grid.addWidget(self.imageGroup, 2, 0)
 
-        # grid.addWidget(QtWidgets.QLabel("colormap"), 3, 0)
-        # grid.addWidget(self.colormapBox, 3, 1)
-
         self.setLayout(grid)
 
     def updatePatternRange(self):
@@ -229,7 +223,7 @@ class PatternViewer(QtWidgets.QWidget):
         tr.translate(x0 - 0.5, y0 - 0.5)
         s = self._dm.patterns[rawIndex].sum()
         self.indexGroup.setTitle(
-            f"index: {rawIndex:06d}/{self._dm.patterns.shape[0]:06d} sum:{s}"
+            f"index: {rawIndex:06d}/{self._dm.patterns.shape[0]:06d} sum: {s}"
         )
         if self._imageInit:
             self.imageViewer.setImage(img, transform=tr)
