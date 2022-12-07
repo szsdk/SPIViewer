@@ -126,26 +126,26 @@ class PatternViewer(QtWidgets.QWidget):
         self.updatePatternRange()
         self.updateRotation(self.rotation)
         self._gears = {
-            QtCore.Qt.Key_N: utils.Gear([100, 10, 1], [0.1, 0.5]),
-            QtCore.Qt.Key_P: utils.Gear([100, 10, 1], [0.1, 0.5]),
-            QtCore.Qt.Key_A: utils.Gear([5, 1], [0.2]),
-            QtCore.Qt.Key_S: utils.Gear([5, 1], [0.2]),
+            QtCore.Qt.Key.Key_N: utils.Gear([100, 10, 1], [0.1, 0.5]),
+            QtCore.Qt.Key.Key_P: utils.Gear([100, 10, 1], [0.1, 0.5]),
+            QtCore.Qt.Key.Key_A: utils.Gear([5, 1], [0.2]),
+            QtCore.Qt.Key.Key_S: utils.Gear([5, 1], [0.2]),
         }
 
     def keyPressEvent(self, event):
         event.accept()
-        if event.key() == QtCore.Qt.Key_N:
-            self._dm.selectNext(d=self._gears[QtCore.Qt.Key_N].getSpeed())
-        elif event.key() == QtCore.Qt.Key_P:
-            self._dm.selectPrevious(d=self._gears[QtCore.Qt.Key_N].getSpeed())
-        elif event.key() == QtCore.Qt.Key_R:
+        if event.key() == QtCore.Qt.Key.Key_N:
+            self._dm.selectNext(d=self._gears[QtCore.Qt.Key.Key_N].getSpeed())
+        elif event.key() == QtCore.Qt.Key.Key_P:
+            self._dm.selectPrevious(d=self._gears[QtCore.Qt.Key.Key_N].getSpeed())
+        elif event.key() == QtCore.Qt.Key.Key_R:
             self._dm.selectRandomly()
-        elif event.key() == QtCore.Qt.Key_A:
-            d = self._gears[QtCore.Qt.Key_A].getSpeed()
+        elif event.key() == QtCore.Qt.Key.Key_A:
+            d = self._gears[QtCore.Qt.Key.Key_A].getSpeed()
             self.rotationSlider.setValue(
                 (self.rotationSlider.value() - d) % 360)
-        elif event.key() == QtCore.Qt.Key_S:
-            d = self._gears[QtCore.Qt.Key_S].getSpeed()
+        elif event.key() == QtCore.Qt.Key.Key_S:
+            d = self._gears[QtCore.Qt.Key.Key_S].getSpeed()
             self.rotationSlider.setValue(
                 (self.rotationSlider.value() + d) % 360)
         else:
@@ -160,7 +160,7 @@ class PatternViewer(QtWidgets.QWidget):
         hbox = QtWidgets.QHBoxLayout()
         self.indexGroup.setLayout(hbox)
         self.patternSelectSpinBox = QtWidgets.QSpinBox(self)
-        self.patternSlider = QtWidgets.QSlider(QtCore.Qt.Horizontal,
+        self.patternSlider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal,
                                                parent=self)
         self.patternNumberLabel = QtWidgets.QLabel()
         hbox.addWidget(self.patternSelectSpinBox)
@@ -170,7 +170,7 @@ class PatternViewer(QtWidgets.QWidget):
 
         self.imageGroup = QtWidgets.QGroupBox("Image")
         igLayout = QtWidgets.QGridLayout()
-        self.rotationSlider = QtWidgets.QSlider(QtCore.Qt.Horizontal,
+        self.rotationSlider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal,
                                                 parent=self)
         self.rotationSlider.setMinimum(0)
         self.rotationSlider.setMaximum(359)
