@@ -18,25 +18,28 @@ def _symmetrizedDetr(det, symmetrize):
         new_det = det
     else:
         dd = det.to_dict()
-        dd['coor'] = np.concatenate(
-            [dd['coor'], dd['coor'] * np.array([-1, -1, 1])], axis=0)
-        dd['factor'] = np.concatenate([dd['factor']] * 2)
-        dd['mask'] = np.concatenate([dd['mask']] * 2)
+        dd["coor"] = np.concatenate(
+            [dd["coor"], dd["coor"] * np.array([-1, -1, 1])], axis=0
+        )
+        dd["factor"] = np.concatenate([dd["factor"]] * 2)
+        dd["mask"] = np.concatenate([dd["mask"]] * 2)
         new_det = ef.detector(**dd)
     return ef.det_render(new_det)
 
 
 class PatternDataModel(QtCore.QObject):
-    selected = QtCore.pyqtSignal(int, np.ndarray)
+    selected = QtCore.pyqtSignal(np.ndarray)
     selectedListChanged = QtCore.pyqtSignal()
 
-    def __init__(self,
-                 patterns,
-                 detector=None,
-                 initIndex=0,
-                 selectedList=None,
-                 symmetrize = False,
-                 applyMask=False):
+    def __init__(
+        self,
+        patterns,
+        detector=None,
+        initIndex=0,
+        selectedList=None,
+        symmetrize=False,
+        applyMask=False,
+    ):
         super().__init__()
         self._initialized = False
         self.patterns = patterns
@@ -44,11 +47,13 @@ class PatternDataModel(QtCore.QObject):
         self.detectorRender = None
         self.symmetrize = False
         self._cache = cachetools.LRUCache(maxsize=32)
-        self._idx = initIndex
-        self.selectedList = (np.arange(self.patterns.shape[0])
-                             if selectedList is None else selectedList)
+        self._index = initIndex
+        self.selectedList = (
+            np.arange(self.patterns.shape[0]) if selectedList is None else selectedList
+        )
+        self._rawIndex = int(self.selectedList[self.index])
         self._applyMask = applyMask
-        self._protectIdx = False
+        self._protectIndex = False
         self.setSymmetrize(symmetrize)
         self._initialized = True
 
@@ -62,8 +67,9 @@ class PatternDataModel(QtCore.QObject):
         self.select(self.index)
 
     def updateSelectedList(self, selectedList):
-        self.selectedList = (np.arange(self.patterns.shape[0])
-                             if selectedList is None else selectedList)
+        self.selectedList = (
+            np.arange(self.patterns.shape[0]) if selectedList is None else selectedList
+        )
         self.selectedListChanged.emit()
         self.select(0)
 
@@ -80,15 +86,23 @@ class PatternDataModel(QtCore.QObject):
 
     @property
     def index(self):
-        return self._idx
+        return self._index
 
-    def select(self, idx: int):
-        if self._protectIdx:
+    @property
+    def rawIndex(self):
+        return self._rawIndex
+
+    def select(self, index: int):
+        if self._protectIndex:
             return
-        self._protectIdx = True
-        self._idx = idx
-        self.selected.emit(*self.getSelection())
-        self._protectIdx = False
+        self._index = index
+        self.selectByRawIndex(int(self.selectedList[self.index]))
+
+    def selectByRawIndex(self, rawIndex):
+        self._rawIndex = rawIndex
+        self._protectIndex = True
+        self.selected.emit(self.getSelection())
+        self._protectIndex = False
 
     def selectNext(self, d: int = 1):
         self.select((self.index + d) % len(self))
@@ -100,12 +114,11 @@ class PatternDataModel(QtCore.QObject):
         self.select(np.random.choice(len(self)))
 
     def getSelection(self):
-        rawIndex = int(self.selectedList[self._idx])
-        return rawIndex, self._getImage(rawIndex)
+        return self.getImage(self.rawIndex)
 
     @cachetools.cachedmethod(operator.attrgetter("_cache"))
-    def _getImage(self, idx):
-        img = self.patterns[idx]
+    def getImage(self, index):
+        img = self.patterns[index]
         if not self.symmetrize:
             if self.detectorRender is None:
                 ans = img
@@ -115,8 +128,10 @@ class PatternDataModel(QtCore.QObject):
             if self.detectorRender is None:
                 ans = (img + img[::-1, ::-1]) / 2
             else:
-                ans = self.detectorRender.render(np.concatenate([img] * 2), intensity=True)
-        if self.applyMask and hasattr(ans, 'mask'):
+                ans = self.detectorRender.render(
+                    np.concatenate([img] * 2), intensity=True
+                )
+        if self.applyMask and hasattr(ans, "mask"):
             ans[ans.mask] = np.nan
         return ans
 
@@ -132,22 +147,50 @@ class PatternViewerShortcuts:
             QtCore.Qt.Key.Key_Minus: utils.Gear([5, 1], [0.2]),
             QtCore.Qt.Key.Key_Equal: utils.Gear([5, 1], [0.2]),
         }
+        self.bookmarks = dict()
+        self._marking = False
+
     def keyPressEvent(self, event, pv):
         event.accept()
-        if event.key() == QtCore.Qt.Key.Key_N:
+        text = event.text()
+        if self._marking:
+            self._marking = False
+            if not text.isdigit():
+                raise Exception()
+            self.bookmarks[text] = pv._dm.rawIndex, pv.rotation
+            return
+
+        if text.isdigit():
+            rawIndex, rotation = self.bookmarks.get(text, (None, None))
+            if rawIndex is None:
+                raise Exception()
+            self.bookmarks["0"] = pv._dm.rawIndex, pv.rotation
+            if rawIndex not in pv._dm.selectedList:
+                pv._dm.selectByRawIndex(rawIndex)
+            else:
+                index = np.where(pv._dm.selectedList == rawIndex)[0][0]
+                pv._dm.select(rawIndex)
+            pv.rotationSlider.setValue(rotation)
+            return
+
+        key = event.key()
+        if key == QtCore.Qt.Key.Key_M:
+            self._marking = True
+        elif key == QtCore.Qt.Key.Key_N:
+            self.bookmarks["0"] = pv._dm.rawIndex, pv.rotation
             pv._dm.selectNext(d=self._gears[QtCore.Qt.Key.Key_N].getSpeed())
-        elif event.key() == QtCore.Qt.Key.Key_P:
+        elif key == QtCore.Qt.Key.Key_P:
+            self.bookmarks["0"] = pv._dm.rawIndex, pv.rotation
             pv._dm.selectPrevious(d=self._gears[QtCore.Qt.Key.Key_N].getSpeed())
-        elif event.key() == QtCore.Qt.Key.Key_R:
+        elif key == QtCore.Qt.Key.Key_R:
+            self.bookmarks["0"] = pv._dm.rawIndex, pv.rotation
             pv._dm.selectRandomly()
-        elif event.key() == QtCore.Qt.Key.Key_Minus:
+        elif key == QtCore.Qt.Key.Key_Minus:
             d = self._gears[QtCore.Qt.Key.Key_Minus].getSpeed()
-            pv.rotationSlider.setValue(
-                (pv.rotationSlider.value() - d) % 360)
-        elif event.key() == QtCore.Qt.Key.Key_Equal:
+            pv.rotationSlider.setValue((pv.rotationSlider.value() - d) % 360)
+        elif key == QtCore.Qt.Key.Key_Equal:
             d = self._gears[QtCore.Qt.Key.Key_Equal].getSpeed()
-            pv.rotationSlider.setValue(
-                (pv.rotationSlider.value() + d) % 360)
+            pv.rotationSlider.setValue((pv.rotationSlider.value() + d) % 360)
         else:
             event.ignore()
 
@@ -161,9 +204,11 @@ class PatternViewer(QtWidgets.QWidget):
         self.patternSelectSpinBox.valueChanged.connect(self._dm.select)
         self.patternSlider.valueChanged.connect(self._dm.select)
         self._dm.selected.connect(
-            lambda a, b: self.patternSelectSpinBox.setValue(self._dm.index))
+            lambda a: self.patternSelectSpinBox.setValue(self._dm.index)
+        )
         self._dm.selected.connect(
-            lambda a, b: self.patternSlider.setValue(self._dm.index))
+            lambda a: self.patternSlider.setValue(self._dm.index)
+        )
         self._dm.selected.connect(self.updateImage)
         self._dm.selectedListChanged.connect(self.updatePatternRange)
         self._imageInit = True
@@ -183,8 +228,9 @@ class PatternViewer(QtWidgets.QWidget):
         hbox = QtWidgets.QHBoxLayout()
         self.indexGroup.setLayout(hbox)
         self.patternSelectSpinBox = QtWidgets.QSpinBox(self)
-        self.patternSlider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal,
-                                               parent=self)
+        self.patternSlider = QtWidgets.QSlider(
+            QtCore.Qt.Orientation.Horizontal, parent=self
+        )
         self.patternNumberLabel = QtWidgets.QLabel()
         hbox.addWidget(self.patternSelectSpinBox)
         hbox.addWidget(self.patternNumberLabel)
@@ -193,8 +239,9 @@ class PatternViewer(QtWidgets.QWidget):
 
         self.imageGroup = QtWidgets.QGroupBox("Image")
         igLayout = QtWidgets.QGridLayout()
-        self.rotationSlider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal,
-                                                parent=self)
+        self.rotationSlider = QtWidgets.QSlider(
+            QtCore.Qt.Orientation.Horizontal, parent=self
+        )
         self.rotationSlider.setMinimum(0)
         self.rotationSlider.setMaximum(359)
         self.rotationSlider.setValue(0)
@@ -204,9 +251,7 @@ class PatternViewer(QtWidgets.QWidget):
 
         self.symmetrizeCheckBox = QtWidgets.QCheckBox("symmetrize")
         self.symmetrizeCheckBox.stateChanged.connect(
-            lambda a: self._dm.setSymmetrize(
-                self.symmetrizeCheckBox.isChecked()
-            )
+            lambda a: self._dm.setSymmetrize(self.symmetrizeCheckBox.isChecked())
         )
         igLayout.addWidget(self.symmetrizeCheckBox, 1, 2)
 
@@ -219,8 +264,8 @@ class PatternViewer(QtWidgets.QWidget):
         self.colormapBox = QtWidgets.QComboBox(parent=self)
         self.colormapBox.addItems(plt.colormaps())
         self.colormapBox.currentTextChanged.connect(
-            lambda cm: self.imageViewer.setColorMap(
-                pg.colormap.getFromMatplotlib(cm)))
+            lambda cm: self.imageViewer.setColorMap(pg.colormap.getFromMatplotlib(cm))
+        )
         self.colormapBox.setCurrentText("magma")
         self.colormapBox.currentTextChanged.emit("magma")
         igLayout.addWidget(QtWidgets.QLabel("colormap"), 1, 0)
@@ -241,18 +286,18 @@ class PatternViewer(QtWidgets.QWidget):
 
     def updateRotation(self, angle):
         self.rotation = angle
-        self.updateImage(*self._dm.getSelection())
+        self.updateImage(self._dm.getSelection())
 
-    def updateImage(self, rawIndex, img):
+    def updateImage(self, img):
         sx, sy = img.shape
         x0, x1, y0, y1 = self._dm.detectorRender.frame_extent()
         tr = QtGui.QTransform()
         tr.rotate(self.rotation)
         tr.scale((x1 - x0) / sx, (y1 - y0) / sy)
         tr.translate(x0 - 0.5, y0 - 0.5)
-        s = self._dm.patterns[rawIndex].sum()
+        s = self._dm.patterns[self._dm.rawIndex].sum()
         self.indexGroup.setTitle(
-            f"index: {rawIndex:06d}/{self._dm.patterns.shape[0]:06d} sum: {s}"
+            f"index: {self._dm.rawIndex:06d}/{self._dm.patterns.shape[0]:06d} sum: {s}"
         )
         if self._imageInit:
             self.imageViewer.setImage(img, transform=tr)
