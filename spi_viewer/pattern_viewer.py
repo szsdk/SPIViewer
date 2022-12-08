@@ -107,11 +107,20 @@ class PatternDataModel(QtCore.QObject):
     def selectNext(self, d: int = 1):
         self.select((self.index + d) % len(self))
 
+    def selectNextRawIndex(self, d: int = 1):
+        self.selectByRawIndex((self.rawIndex + d) % self.patterns.shape[0])
+
+    def selectPreviousRawIndex(self, d: int = 1):
+        self.selectByRawIndex((self.rawIndex - d) % self.patterns.shape[0])
+
     def selectPrevious(self, d: int = 1):
         self.select((self.index - d) % len(self))
 
     def selectRandomly(self):
         self.select(np.random.choice(len(self)))
+
+    def selectRawIndexRandomly(self):
+        self.selectByRawIndex(np.random.choice(self.patterns.shape[0]))
 
     def getSelection(self):
         return self.getImage(self.rawIndex)
@@ -142,10 +151,10 @@ class PatternDataModel(QtCore.QObject):
 class PatternViewerShortcuts:
     def __init__(self):
         self._gears = {
-            QtCore.Qt.Key.Key_N: utils.Gear([100, 10, 1], [0.1, 0.5]),
-            QtCore.Qt.Key.Key_P: utils.Gear([100, 10, 1], [0.1, 0.5]),
-            QtCore.Qt.Key.Key_Minus: utils.Gear([5, 1], [0.2]),
-            QtCore.Qt.Key.Key_Equal: utils.Gear([5, 1], [0.2]),
+            "n": utils.Gear([100, 10, 1], [0.1, 0.5]),
+            "p": utils.Gear([100, 10, 1], [0.1, 0.5]),
+            "-": utils.Gear([5, 1], [0.2]),
+            "=": utils.Gear([5, 1], [0.2]),
         }
         self.bookmarks = dict()
         self._marking = False
@@ -178,22 +187,31 @@ class PatternViewerShortcuts:
             return
 
         key = event.key()
-        if key == QtCore.Qt.Key.Key_M:
+        if text == "M":
             self._marking = True
-        elif key == QtCore.Qt.Key.Key_N:
+        elif text == "n":
             self.bookmarks["0"] = pv._dm.rawIndex, pv.rotation
-            pv._dm.selectNext(d=self._gears[QtCore.Qt.Key.Key_N].getSpeed())
-        elif key == QtCore.Qt.Key.Key_P:
+            pv._dm.selectNext(d=self._gears["n"].getSpeed())
+        elif text == "N":
             self.bookmarks["0"] = pv._dm.rawIndex, pv.rotation
-            pv._dm.selectPrevious(d=self._gears[QtCore.Qt.Key.Key_N].getSpeed())
-        elif key == QtCore.Qt.Key.Key_R:
+            pv._dm.selectNextRawIndex(d=self._gears["n"].getSpeed())
+        elif text == "p":
+            self.bookmarks["0"] = pv._dm.rawIndex, pv.rotation
+            pv._dm.selectPrevious(d=self._gears["p"].getSpeed())
+        elif text == "P":
+            self.bookmarks["0"] = pv._dm.rawIndex, pv.rotation
+            pv._dm.selectPreviousRawIndex(d=self._gears["p"].getSpeed())
+        elif text == "r":
             self.bookmarks["0"] = pv._dm.rawIndex, pv.rotation
             pv._dm.selectRandomly()
-        elif key == QtCore.Qt.Key.Key_Minus:
-            d = self._gears[QtCore.Qt.Key.Key_Minus].getSpeed()
+        elif text == "R":
+            self.bookmarks["0"] = pv._dm.rawIndex, pv.rotation
+            pv._dm.selectRawIndexRandomly()
+        elif text == "-":
+            d = self._gears["-"].getSpeed()
             pv.rotationSlider.setValue((pv.rotationSlider.value() - d) % 360)
-        elif key == QtCore.Qt.Key.Key_Equal:
-            d = self._gears[QtCore.Qt.Key.Key_Equal].getSpeed()
+        elif text == "=":
+            d = self._gears["="].getSpeed()
             pv.rotationSlider.setValue((pv.rotationSlider.value() + d) % 360)
         elif text in self._custom:
             self._custom[text]()
