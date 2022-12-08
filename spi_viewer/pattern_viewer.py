@@ -35,7 +35,8 @@ class PatternDataModel(QtCore.QObject):
                  detector=None,
                  initIndex=0,
                  selectedList=None,
-                 symmetrize = False):
+                 symmetrize = False,
+                 applyMask=False):
         super().__init__()
         self._initialized = False
         self.patterns = patterns
@@ -46,6 +47,7 @@ class PatternDataModel(QtCore.QObject):
         self._idx = initIndex
         self.selectedList = (np.arange(self.patterns.shape[0])
                              if selectedList is None else selectedList)
+        self._applyMask = applyMask
         self._protectIdx = False
         self.setSymmetrize(symmetrize)
         self._initialized = True
@@ -64,6 +66,17 @@ class PatternDataModel(QtCore.QObject):
                              if selectedList is None else selectedList)
         self.selectedListChanged.emit()
         self.select(0)
+
+    @property
+    def applyMask(self):
+        return self._applyMask
+
+    def setApplyMask(self, applyMask: bool):
+        update = self._applyMask != applyMask
+        self._applyMask = applyMask
+        if update:
+            self._cache.clear()
+            self.select(self.index)
 
     @property
     def index(self):
@@ -95,17 +108,48 @@ class PatternDataModel(QtCore.QObject):
         img = self.patterns[idx]
         if not self.symmetrize:
             if self.detectorRender is None:
-                return img
+                ans = img
             else:
-                return self.detectorRender.render(img)
+                ans = self.detectorRender.render(img)
         else:
             if self.detectorRender is None:
-                return (img + img[::-1, ::-1]) / 2
+                ans = (img + img[::-1, ::-1]) / 2
             else:
-                return self.detectorRender.render(np.concatenate([img] * 2), intensity=True)
+                ans = self.detectorRender.render(np.concatenate([img] * 2), intensity=True)
+        if self.applyMask and hasattr(ans, 'mask'):
+            ans[ans.mask] = np.nan
+        return ans
 
     def __len__(self):
         return len(self.selectedList)
+
+
+class PatternViewerShortcuts:
+    def __init__(self):
+        self._gears = {
+            QtCore.Qt.Key.Key_N: utils.Gear([100, 10, 1], [0.1, 0.5]),
+            QtCore.Qt.Key.Key_P: utils.Gear([100, 10, 1], [0.1, 0.5]),
+            QtCore.Qt.Key.Key_Minus: utils.Gear([5, 1], [0.2]),
+            QtCore.Qt.Key.Key_Equal: utils.Gear([5, 1], [0.2]),
+        }
+    def keyPressEvent(self, event, pv):
+        event.accept()
+        if event.key() == QtCore.Qt.Key.Key_N:
+            pv._dm.selectNext(d=self._gears[QtCore.Qt.Key.Key_N].getSpeed())
+        elif event.key() == QtCore.Qt.Key.Key_P:
+            pv._dm.selectPrevious(d=self._gears[QtCore.Qt.Key.Key_N].getSpeed())
+        elif event.key() == QtCore.Qt.Key.Key_R:
+            pv._dm.selectRandomly()
+        elif event.key() == QtCore.Qt.Key.Key_Minus:
+            d = self._gears[QtCore.Qt.Key.Key_Minus].getSpeed()
+            pv.rotationSlider.setValue(
+                (pv.rotationSlider.value() - d) % 360)
+        elif event.key() == QtCore.Qt.Key.Key_Equal:
+            d = self._gears[QtCore.Qt.Key.Key_Equal].getSpeed()
+            pv.rotationSlider.setValue(
+                (pv.rotationSlider.value() + d) % 360)
+        else:
+            event.ignore()
 
 
 class PatternViewer(QtWidgets.QWidget):
@@ -125,31 +169,10 @@ class PatternViewer(QtWidgets.QWidget):
         self._imageInit = True
         self.updatePatternRange()
         self.updateRotation(self.rotation)
-        self._gears = {
-            QtCore.Qt.Key.Key_N: utils.Gear([100, 10, 1], [0.1, 0.5]),
-            QtCore.Qt.Key.Key_P: utils.Gear([100, 10, 1], [0.1, 0.5]),
-            QtCore.Qt.Key.Key_A: utils.Gear([5, 1], [0.2]),
-            QtCore.Qt.Key.Key_S: utils.Gear([5, 1], [0.2]),
-        }
+        self._shortcuts = PatternViewerShortcuts()
 
     def keyPressEvent(self, event):
-        event.accept()
-        if event.key() == QtCore.Qt.Key.Key_N:
-            self._dm.selectNext(d=self._gears[QtCore.Qt.Key.Key_N].getSpeed())
-        elif event.key() == QtCore.Qt.Key.Key_P:
-            self._dm.selectPrevious(d=self._gears[QtCore.Qt.Key.Key_N].getSpeed())
-        elif event.key() == QtCore.Qt.Key.Key_R:
-            self._dm.selectRandomly()
-        elif event.key() == QtCore.Qt.Key.Key_A:
-            d = self._gears[QtCore.Qt.Key.Key_A].getSpeed()
-            self.rotationSlider.setValue(
-                (self.rotationSlider.value() - d) % 360)
-        elif event.key() == QtCore.Qt.Key.Key_S:
-            d = self._gears[QtCore.Qt.Key.Key_S].getSpeed()
-            self.rotationSlider.setValue(
-                (self.rotationSlider.value() + d) % 360)
-        else:
-            event.ignore()
+        self._shortcuts.keyPressEvent(event, self)
 
     def initUI(self):
         grid = QtWidgets.QGridLayout()
@@ -177,7 +200,7 @@ class PatternViewer(QtWidgets.QWidget):
         self.rotationSlider.setValue(0)
         self.rotationSlider.valueChanged.connect(self.updateRotation)
         igLayout.addWidget(QtWidgets.QLabel("rotation"), 0, 0)
-        igLayout.addWidget(self.rotationSlider, 0, 1, 1, 2)
+        igLayout.addWidget(self.rotationSlider, 0, 1, 1, 3)
 
         self.symmetrizeCheckBox = QtWidgets.QCheckBox("symmetrize")
         self.symmetrizeCheckBox.stateChanged.connect(
@@ -186,6 +209,12 @@ class PatternViewer(QtWidgets.QWidget):
             )
         )
         igLayout.addWidget(self.symmetrizeCheckBox, 1, 2)
+
+        self.applyMaskCheckBox = QtWidgets.QCheckBox("apply mask")
+        self.applyMaskCheckBox.stateChanged.connect(
+            lambda a: self._dm.setApplyMask(self.applyMaskCheckBox.isChecked())
+        )
+        igLayout.addWidget(self.applyMaskCheckBox, 1, 3)
 
         self.colormapBox = QtWidgets.QComboBox(parent=self)
         self.colormapBox.addItems(plt.colormaps())
