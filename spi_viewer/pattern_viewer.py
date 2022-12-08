@@ -149,6 +149,10 @@ class PatternViewerShortcuts:
         }
         self.bookmarks = dict()
         self._marking = False
+        self._custom = dict()
+
+    def register(self, k, f):
+        self._custom[k] = f
 
     def keyPressEvent(self, event, pv):
         event.accept()
@@ -191,6 +195,8 @@ class PatternViewerShortcuts:
         elif key == QtCore.Qt.Key.Key_Equal:
             d = self._gears[QtCore.Qt.Key.Key_Equal].getSpeed()
             pv.rotationSlider.setValue((pv.rotationSlider.value() + d) % 360)
+        elif text in self._custom:
+            self._custom[text]()
         else:
             event.ignore()
 
@@ -206,18 +212,16 @@ class PatternViewer(QtWidgets.QWidget):
         self._dm.selected.connect(
             lambda a: self.patternSelectSpinBox.setValue(self._dm.index)
         )
-        self._dm.selected.connect(
-            lambda a: self.patternSlider.setValue(self._dm.index)
-        )
+        self._dm.selected.connect(lambda a: self.patternSlider.setValue(self._dm.index))
         self._dm.selected.connect(self.updateImage)
         self._dm.selectedListChanged.connect(self.updatePatternRange)
         self._imageInit = True
         self.updatePatternRange()
         self.updateRotation(self.rotation)
-        self._shortcuts = PatternViewerShortcuts()
+        self.shortcuts = PatternViewerShortcuts()
 
     def keyPressEvent(self, event):
-        self._shortcuts.keyPressEvent(event, self)
+        self.shortcuts.keyPressEvent(event, self)
 
     def initUI(self):
         grid = QtWidgets.QGridLayout()
