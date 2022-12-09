@@ -88,7 +88,7 @@ class PatternDataModel(QtCore.QObject):
         if rawIndex not in self.selectedList:
             return
         i = np.where(self.selectedList == rawIndex)[0][0]
-        newSelectedList = np.delete(self.selectedList, rawIndex)
+        newSelectedList = np.delete(self.selectedList, i)
         self.setSelectedList(newSelectedList)
         self.select(min(i, len(newSelectedList) - 1))
 
@@ -218,6 +218,12 @@ class PatternViewerShortcuts:
             pv.dataset2.addPattern(pv.currentDataset.rawIndex)
         elif text  == "x":
             pv.currentDataset.removePattern(pv.currentDataset.rawIndex)
+        elif text  == "S":
+            pv.switchDatasets()
+        elif text  == "s":
+            idx = pv.currentDataset.rawIndex
+            pv.currentDataset.removePattern(pv.currentDataset.rawIndex)
+            pv.dataset2.addPattern(idx)
         elif text in self._custom:
             self._custom[text]()
         else:
@@ -233,7 +239,7 @@ class PatternViewer(QtWidgets.QWidget):
         self._currentDatasetName = self.currentDatasetBox.currentText()
         self._dataset2Name = self.dataset2Box.currentText()
         self._imageInit = True
-        self.setCurrentDataset(self.currentDatasetBox.currentText())
+        self._setCurrentDataset(self.currentDatasetBox.currentText())
         self.updateRotation(self.rotation)
         self.shortcuts = PatternViewerShortcuts()
 
@@ -263,13 +269,13 @@ class PatternViewer(QtWidgets.QWidget):
         self.patternNumberLabel = QtWidgets.QLabel()
         self.currentDatasetBox = QtWidgets.QComboBox(parent=self)
         self.currentDatasetBox.addItems(self.datasets.keys())
-        self.currentDatasetBox.currentTextChanged.connect(self.setCurrentDataset)
+        self.currentDatasetBox.currentTextChanged.connect(self._setCurrentDataset)
         self.patternSelectSpinBox.valueChanged.connect(lambda v: self.currentDataset.select(v))
         self.patternSlider.valueChanged.connect(lambda v: self.currentDataset.select(v))
 
         self.dataset2Box = QtWidgets.QComboBox(parent=self)
         self.dataset2Box.addItems(self.datasets.keys())
-        self.dataset2Box.currentTextChanged.connect(self.setDataset2)
+        self.dataset2Box.currentTextChanged.connect(self._setDataset2)
         hbox.addWidget(self.currentDatasetBox)
         hbox.addWidget(self.patternSelectSpinBox)
         hbox.addWidget(self.patternNumberLabel)
@@ -316,10 +322,17 @@ class PatternViewer(QtWidgets.QWidget):
 
         self.setLayout(grid)
 
-    def setDataset2(self, sl: str):
+    def switchDatasets(self):
+        t = self._dataset2Name
+        self.dataset2Box.setCurrentText(self._currentDatasetName)
+        self.currentDatasetBox.setCurrentText(t)
+        # self._setDataset2(self._currentDatasetName)
+        # self._setCurrentDataset(t)
+
+    def _setDataset2(self, sl: str):
         self._dataset2Name = sl
 
-    def setCurrentDataset(self, sl: str):
+    def _setCurrentDataset(self, sl: str):
         try:
             self.currentDataset.selectedListChanged.disconnect()
             self.currentDataset.selected.disconnect()
@@ -335,6 +348,8 @@ class PatternViewer(QtWidgets.QWidget):
         self.currentDataset.selectedListChanged.connect(self.updatePatternRange)
         self.updatePatternRange()
         self.currentDataset.select(pidx)
+        self.symmetrizeCheckBox.setChecked(self.currentDataset.symmetrize)
+        self.applyMaskCheckBox.setChecked(self.currentDataset.applyMask)
 
     def updatePatternRange(self):
         numData = len(self.currentDataset)
