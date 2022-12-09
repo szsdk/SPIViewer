@@ -6,11 +6,14 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 import matplotlib.pyplot as plt
 from . import utils
+import logging
 
 __all__ = [
     "PatternDataModel",
     "PatternViewer",
 ]
+
+_logger = logging.getLogger(__file__)
 
 
 def _symmetrizedDetr(det, symmetrize):
@@ -39,6 +42,7 @@ class PatternDataModel(QtCore.QObject):
         selectedList=None,
         symmetrize=False,
         applyMask=False,
+        modify=True
     ):
         super().__init__()
         self._initialized = False
@@ -48,6 +52,7 @@ class PatternDataModel(QtCore.QObject):
         self.symmetrize = False
         self._cache = cachetools.LRUCache(maxsize=32)
         self._index = initIndex
+        self.modify = modify
         self.selectedList = (
             np.arange(self.patterns.shape[0]) if selectedList is None else selectedList
         )
@@ -66,12 +71,26 @@ class PatternDataModel(QtCore.QObject):
         self._cache.clear()
         self.select(self.index)
 
-    def updateSelectedList(self, selectedList):
-        self.selectedList = (
-            np.arange(self.patterns.shape[0]) if selectedList is None else selectedList
-        )
+    def setSelectedList(self, selectedList):
+        if not self.modify:
+            raise Exception("Cannot modify")
+        self.selectedList = selectedList
         self.selectedListChanged.emit()
         self.select(0)
+
+    def addPattern(self, rawIndex):
+        if rawIndex in self.selectedList:
+            return
+        newSelectedList = np.sort(np.append(self.selectedList, rawIndex))
+        self.setSelectedList(newSelectedList)
+
+    def removePattern(self, rawIndex):
+        if rawIndex not in self.selectedList:
+            return
+        i = np.where(self.selectedList == rawIndex)[0][0]
+        newSelectedList = np.delete(self.selectedList, rawIndex)
+        self.setSelectedList(newSelectedList)
+        self.select(min(i, len(newSelectedList) - 1))
 
     @property
     def applyMask(self):
@@ -107,20 +126,11 @@ class PatternDataModel(QtCore.QObject):
     def selectNext(self, d: int = 1):
         self.select((self.index + d) % len(self))
 
-    def selectNextRawIndex(self, d: int = 1):
-        self.selectByRawIndex((self.rawIndex + d) % self.patterns.shape[0])
-
-    def selectPreviousRawIndex(self, d: int = 1):
-        self.selectByRawIndex((self.rawIndex - d) % self.patterns.shape[0])
-
     def selectPrevious(self, d: int = 1):
         self.select((self.index - d) % len(self))
 
     def selectRandomly(self):
         self.select(np.random.choice(len(self)))
-
-    def selectRawIndexRandomly(self):
-        self.selectByRawIndex(np.random.choice(self.patterns.shape[0]))
 
     def getSelection(self):
         return self.getImage(self.rawIndex)
@@ -170,49 +180,44 @@ class PatternViewerShortcuts:
             self._marking = False
             if not text.isdigit():
                 raise Exception()
-            self.bookmarks[text] = pv._dm.rawIndex, pv.rotation
+            self.bookmarks[text] = pv.currentDataset.rawIndex, pv.rotation
             return
 
         if text.isdigit():
             rawIndex, rotation = self.bookmarks.get(text, (None, None))
             if rawIndex is None:
                 raise Exception()
-            self.bookmarks["0"] = pv._dm.rawIndex, pv.rotation
-            if rawIndex not in pv._dm.selectedList:
-                pv._dm.selectByRawIndex(rawIndex)
+            self.bookmarks["0"] = pv.currentDataset.rawIndex, pv.rotation
+            if rawIndex not in pv.currentDataset.selectedList:
+                pv.currentDataset.selectByRawIndex(rawIndex)
             else:
-                index = np.where(pv._dm.selectedList == rawIndex)[0][0]
-                pv._dm.select(rawIndex)
+                index = np.where(pv.currentDataset.selectedList == rawIndex)[0][0]
+                pv.currentDataset.select(rawIndex)
             pv.rotationSlider.setValue(rotation)
             return
 
         key = event.key()
-        if text == "M":
+        if text == "m":
             self._marking = True
         elif text == "n":
-            self.bookmarks["0"] = pv._dm.rawIndex, pv.rotation
-            pv._dm.selectNext(d=self._gears["n"].getSpeed())
-        elif text == "N":
-            self.bookmarks["0"] = pv._dm.rawIndex, pv.rotation
-            pv._dm.selectNextRawIndex(d=self._gears["n"].getSpeed())
+            self.bookmarks["0"] = pv.currentDataset.rawIndex, pv.rotation
+            pv.currentDataset.selectNext(d=self._gears["n"].getSpeed())
         elif text == "p":
-            self.bookmarks["0"] = pv._dm.rawIndex, pv.rotation
-            pv._dm.selectPrevious(d=self._gears["p"].getSpeed())
-        elif text == "P":
-            self.bookmarks["0"] = pv._dm.rawIndex, pv.rotation
-            pv._dm.selectPreviousRawIndex(d=self._gears["p"].getSpeed())
+            self.bookmarks["0"] = pv.currentDataset.rawIndex, pv.rotation
+            pv.currentDataset.selectPrevious(d=self._gears["p"].getSpeed())
         elif text == "r":
-            self.bookmarks["0"] = pv._dm.rawIndex, pv.rotation
-            pv._dm.selectRandomly()
-        elif text == "R":
-            self.bookmarks["0"] = pv._dm.rawIndex, pv.rotation
-            pv._dm.selectRawIndexRandomly()
+            self.bookmarks["0"] = pv.currentDataset.rawIndex, pv.rotation
+            pv.currentDataset.selectRandomly()
         elif text == "-":
             d = self._gears["-"].getSpeed()
             pv.rotationSlider.setValue((pv.rotationSlider.value() - d) % 360)
         elif text == "=":
             d = self._gears["="].getSpeed()
             pv.rotationSlider.setValue((pv.rotationSlider.value() + d) % 360)
+        elif text  == "a":
+            pv.dataset2.addPattern(pv.currentDataset.rawIndex)
+        elif text  == "x":
+            pv.currentDataset.removePattern(pv.currentDataset.rawIndex)
         elif text in self._custom:
             self._custom[text]()
         else:
@@ -220,23 +225,25 @@ class PatternViewerShortcuts:
 
 
 class PatternViewer(QtWidgets.QWidget):
-    def __init__(self, dataModel, parent=None):
+    def __init__(self, datasets, parent=None):
         super().__init__(parent=parent)
         self.rotation = 0
+        self.datasets = datasets
         self.initUI()
-        self._dm = dataModel  # data model
-        self.patternSelectSpinBox.valueChanged.connect(self._dm.select)
-        self.patternSlider.valueChanged.connect(self._dm.select)
-        self._dm.selected.connect(
-            lambda a: self.patternSelectSpinBox.setValue(self._dm.index)
-        )
-        self._dm.selected.connect(lambda a: self.patternSlider.setValue(self._dm.index))
-        self._dm.selected.connect(self.updateImage)
-        self._dm.selectedListChanged.connect(self.updatePatternRange)
+        self._currentDatasetName = self.currentDatasetBox.currentText()
+        self._dataset2Name = self.dataset2Box.currentText()
         self._imageInit = True
-        self.updatePatternRange()
+        self.setCurrentDataset(self.currentDatasetBox.currentText())
         self.updateRotation(self.rotation)
         self.shortcuts = PatternViewerShortcuts()
+
+    @property
+    def currentDataset(self):
+        return self.datasets[self._currentDatasetName]
+
+    @property
+    def dataset2(self):
+        return self.datasets[self._dataset2Name]
 
     def keyPressEvent(self, event):
         self.shortcuts.keyPressEvent(event, self)
@@ -254,9 +261,20 @@ class PatternViewer(QtWidgets.QWidget):
             QtCore.Qt.Orientation.Horizontal, parent=self
         )
         self.patternNumberLabel = QtWidgets.QLabel()
+        self.currentDatasetBox = QtWidgets.QComboBox(parent=self)
+        self.currentDatasetBox.addItems(self.datasets.keys())
+        self.currentDatasetBox.currentTextChanged.connect(self.setCurrentDataset)
+        self.patternSelectSpinBox.valueChanged.connect(lambda v: self.currentDataset.select(v))
+        self.patternSlider.valueChanged.connect(lambda v: self.currentDataset.select(v))
+
+        self.dataset2Box = QtWidgets.QComboBox(parent=self)
+        self.dataset2Box.addItems(self.datasets.keys())
+        self.dataset2Box.currentTextChanged.connect(self.setDataset2)
+        hbox.addWidget(self.currentDatasetBox)
         hbox.addWidget(self.patternSelectSpinBox)
         hbox.addWidget(self.patternNumberLabel)
         hbox.addWidget(self.patternSlider)
+        hbox.addWidget(self.dataset2Box)
         grid.addWidget(self.indexGroup, 1, 0, 1, 1)
 
         self.imageGroup = QtWidgets.QGroupBox("Image")
@@ -273,13 +291,13 @@ class PatternViewer(QtWidgets.QWidget):
 
         self.symmetrizeCheckBox = QtWidgets.QCheckBox("symmetrize")
         self.symmetrizeCheckBox.stateChanged.connect(
-            lambda a: self._dm.setSymmetrize(self.symmetrizeCheckBox.isChecked())
+            lambda a: self.currentDataset.setSymmetrize(self.symmetrizeCheckBox.isChecked())
         )
         igLayout.addWidget(self.symmetrizeCheckBox, 1, 2)
 
         self.applyMaskCheckBox = QtWidgets.QCheckBox("apply mask")
         self.applyMaskCheckBox.stateChanged.connect(
-            lambda a: self._dm.setApplyMask(self.applyMaskCheckBox.isChecked())
+            lambda a: self.currentDataset.setApplyMask(self.applyMaskCheckBox.isChecked())
         )
         igLayout.addWidget(self.applyMaskCheckBox, 1, 3)
 
@@ -298,8 +316,28 @@ class PatternViewer(QtWidgets.QWidget):
 
         self.setLayout(grid)
 
+    def setDataset2(self, sl: str):
+        self._dataset2Name = sl
+
+    def setCurrentDataset(self, sl: str):
+        try:
+            self.currentDataset.selectedListChanged.disconnect()
+            self.currentDataset.selected.disconnect()
+        except:
+            pass
+        self._currentDatasetName = sl
+        pidx = self.currentDataset.index
+        self.currentDataset.selected.connect(
+            lambda a: self.patternSelectSpinBox.setValue(self.currentDataset.index)
+        )
+        self.currentDataset.selected.connect(lambda a: self.patternSlider.setValue(self.currentDataset.index))
+        self.currentDataset.selected.connect(self.updateImage)
+        self.currentDataset.selectedListChanged.connect(self.updatePatternRange)
+        self.updatePatternRange()
+        self.currentDataset.select(pidx)
+
     def updatePatternRange(self):
-        numData = len(self._dm)
+        numData = len(self.currentDataset)
         self.patternSelectSpinBox.setRange(0, numData - 1)
         self.patternSlider.setMinimum(0)
         self.patternSlider.setMaximum(numData - 1)
@@ -308,18 +346,18 @@ class PatternViewer(QtWidgets.QWidget):
 
     def updateRotation(self, angle):
         self.rotation = angle
-        self.updateImage(self._dm.getSelection())
+        self.updateImage(self.currentDataset.getSelection())
 
     def updateImage(self, img):
         sx, sy = img.shape
-        x0, x1, y0, y1 = self._dm.detectorRender.frame_extent()
+        x0, x1, y0, y1 = self.currentDataset.detectorRender.frame_extent()
         tr = QtGui.QTransform()
         tr.rotate(self.rotation)
         tr.scale((x1 - x0) / sx, (y1 - y0) / sy)
         tr.translate(x0 - 0.5, y0 - 0.5)
-        s = self._dm.patterns[self._dm.rawIndex].sum()
+        s = self.currentDataset.patterns[self.currentDataset.rawIndex].sum()
         self.indexGroup.setTitle(
-            f"index: {self._dm.rawIndex:06d}/{self._dm.patterns.shape[0]:06d} sum: {s}"
+            f"index: {self.currentDataset.rawIndex:06d}/{self.currentDataset.patterns.shape[0]:06d} sum: {s}"
         )
         if self._imageInit:
             self.imageViewer.setImage(img, transform=tr)
