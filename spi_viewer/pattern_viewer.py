@@ -230,7 +230,7 @@ class PatternViewerShortcuts:
             event.ignore()
 
 
-class PatternViewer(QtWidgets.QWidget):
+class PatternViewer(QtWidgets.QMainWindow):
     def __init__(self, datasets, parent=None):
         super().__init__(parent=parent)
         self.rotation = 0
@@ -239,8 +239,9 @@ class PatternViewer(QtWidgets.QWidget):
         self._currentDatasetName = self.currentDatasetBox.currentText()
         self._dataset2Name = self.dataset2Box.currentText()
         self._imageInit = True
-        self._setCurrentDataset(self.currentDatasetBox.currentText())
-        self.updateRotation(self.rotation)
+        if len(self.datasets) > 0:
+            self._setCurrentDataset(self.currentDatasetBox.currentText())
+            self.updateRotation(self.rotation)
         self.shortcuts = PatternViewerShortcuts()
 
     @property
@@ -256,7 +257,12 @@ class PatternViewer(QtWidgets.QWidget):
 
     def initUI(self):
         grid = QtWidgets.QGridLayout()
+
         self.imageViewer = pg.ImageView()
+        self.infoLabel = QtWidgets.QLabel("info", parent=self.imageViewer)
+        self.infoLabel.setAlignment(QtCore.Qt.AlignTop)
+        self.infoLabel.setStyleSheet("color:#888888;")
+        self.infoLabel.move(10, 10)
         grid.addWidget(self.imageViewer, 0, 0, 1, 2)
 
         self.indexGroup = QtWidgets.QGroupBox("Index")
@@ -320,14 +326,21 @@ class PatternViewer(QtWidgets.QWidget):
         self.imageGroup.setLayout(igLayout)
         grid.addWidget(self.imageGroup, 2, 0)
 
-        self.setLayout(grid)
+        self.setCentralWidget(QtWidgets.QWidget(parent=self))
+        self.centralWidget().setLayout(grid)
+        # self.setLayout(grid)
+
+        self.menuBar = self.menuBar()
+        self.menuBar.setNativeMenuBar(False)
+        fileMenu = self.menuBar.addMenu("&File")
+        openAction = fileMenu.addAction("&Open")
+        openAction.triggered.connect(lambda : print("NotImplemented"))
+
 
     def switchDatasets(self):
         t = self._dataset2Name
         self.dataset2Box.setCurrentText(self._currentDatasetName)
         self.currentDatasetBox.setCurrentText(t)
-        # self._setDataset2(self._currentDatasetName)
-        # self._setCurrentDataset(t)
 
     def _setDataset2(self, sl: str):
         self._dataset2Name = sl
