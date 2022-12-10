@@ -42,7 +42,7 @@ class PatternDataModel(QtCore.QObject):
         selectedList=None,
         symmetrize=False,
         applyMask=False,
-        modify=True
+        modify=True,
     ):
         super().__init__()
         self._initialized = False
@@ -214,13 +214,13 @@ class PatternViewerShortcuts:
             pv.setRotation((pv.rotation + self._gears["="].getSpeed()) % 360)
             # d = self._gears["="].getSpeed()
             # pv.rotationSlider.setValue((pv.rotationSlider.value() + d) % 360)
-        elif text  == "a":
+        elif text == "a":
             pv.dataset2.addPattern(pv.currentDataset.rawIndex)
-        elif text  == "x":
+        elif text == "x":
             pv.currentDataset.removePattern(pv.currentDataset.rawIndex)
-        elif text  == "S":
+        elif text == "S":
             pv.switchDatasets()
-        elif text  == "s":
+        elif text == "s":
             idx = pv.currentDataset.rawIndex
             pv.currentDataset.removePattern(pv.currentDataset.rawIndex)
             pv.dataset2.addPattern(idx)
@@ -280,7 +280,9 @@ class PatternViewer(QtWidgets.QMainWindow):
         self.currentDatasetBox = QtWidgets.QComboBox(parent=self)
         self.currentDatasetBox.addItems(self.datasets.keys())
         self.currentDatasetBox.currentTextChanged.connect(self._setCurrentDataset)
-        self.patternSelectSpinBox.valueChanged.connect(lambda v: self.currentDataset.select(v))
+        self.patternSelectSpinBox.valueChanged.connect(
+            lambda v: self.currentDataset.select(v)
+        )
         self.patternSlider.valueChanged.connect(lambda v: self.currentDataset.select(v))
 
         self.dataset2Box = QtWidgets.QComboBox(parent=self)
@@ -304,7 +306,7 @@ class PatternViewer(QtWidgets.QMainWindow):
         self.rotationSlider.valueChanged.connect(self.setRotation)
         self.rotationChanged.connect(self.rotationSlider.setValue)
         self.rotationChanged.connect(
-            lambda r: self.updateImage(self.currentDataset.getSelection())
+            lambda r: self.setImage(self.currentDataset.getSelection())
         )
 
         igLayout.addWidget(QtWidgets.QLabel("rotation"), 0, 0)
@@ -312,13 +314,17 @@ class PatternViewer(QtWidgets.QMainWindow):
 
         self.symmetrizeCheckBox = QtWidgets.QCheckBox("symmetrize")
         self.symmetrizeCheckBox.stateChanged.connect(
-            lambda a: self.currentDataset.setSymmetrize(self.symmetrizeCheckBox.isChecked())
+            lambda a: self.currentDataset.setSymmetrize(
+                self.symmetrizeCheckBox.isChecked()
+            )
         )
         igLayout.addWidget(self.symmetrizeCheckBox, 1, 2)
 
         self.applyMaskCheckBox = QtWidgets.QCheckBox("apply mask")
         self.applyMaskCheckBox.stateChanged.connect(
-            lambda a: self.currentDataset.setApplyMask(self.applyMaskCheckBox.isChecked())
+            lambda a: self.currentDataset.setApplyMask(
+                self.applyMaskCheckBox.isChecked()
+            )
         )
         igLayout.addWidget(self.applyMaskCheckBox, 1, 3)
 
@@ -337,14 +343,32 @@ class PatternViewer(QtWidgets.QMainWindow):
 
         self.setCentralWidget(QtWidgets.QWidget(parent=self))
         self.centralWidget().setLayout(grid)
-        # self.setLayout(grid)
 
         self.menuBar = self.menuBar()
         self.menuBar.setNativeMenuBar(False)
         fileMenu = self.menuBar.addMenu("&File")
         openAction = fileMenu.addAction("&Open")
-        openAction.triggered.connect(lambda : print("NotImplemented"))
+        openAction.triggered.connect(lambda: print("NotImplemented"))
 
+    def setDataset(self, name, d):
+        needUpdate = name in self.datasets
+        self.datasets[name] = d
+        self.currentDatasetBox.addItem(name)
+        self.dataset2Box.addItem(name)
+        if needUpdate:
+            self._setCurrentDataset(name)
+
+    def removeDataset(self, name):
+        if name not in self.datasets:
+            return
+        index = self.currentDatasetBox.findText(name)  # find the index of text
+        self.currentDatasetBox.removeItem(index)
+        index = self.dataset2Box.findText(name)  # find the index of text
+        self.dataset2Box.removeItem(index)
+        if len(self.datasets) == 0:
+            raise NotADirectoryError()
+        if name == self._currentDatasetName:
+            self._setCurrentDataset(next(self.datasets.keys()))
 
     def switchDatasets(self):
         t = self._dataset2Name
@@ -365,8 +389,10 @@ class PatternViewer(QtWidgets.QMainWindow):
         self.currentDataset.selected.connect(
             lambda a: self.patternSelectSpinBox.setValue(self.currentDataset.index)
         )
-        self.currentDataset.selected.connect(lambda a: self.patternSlider.setValue(self.currentDataset.index))
-        self.currentDataset.selected.connect(self.updateImage)
+        self.currentDataset.selected.connect(
+            lambda a: self.patternSlider.setValue(self.currentDataset.index)
+        )
+        self.currentDataset.selected.connect(self.setImage)
         self.currentDataset.selectedListChanged.connect(self.updatePatternRange)
         self.updatePatternRange()
         self.currentDataset.select(pidx)
@@ -393,7 +419,7 @@ class PatternViewer(QtWidgets.QMainWindow):
         self.rotationChanged.emit(r)
         self._protectRotation = False
 
-    def updateImage(self, img):
+    def setImage(self, img):
         sx, sy = img.shape
         x0, x1, y0, y1 = self.currentDataset.detectorRender.frame_extent()
         tr = QtGui.QTransform()
