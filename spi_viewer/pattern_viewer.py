@@ -147,9 +147,7 @@ class PatternDataModel(QtCore.QObject):
             if self.detectorRender is None:
                 ans = (img + img[::-1, ::-1]) / 2
             else:
-                ans = self.detectorRender.render(
-                    np.concatenate([img] * 2), intensity=True
-                )
+                ans = self.detectorRender.render(np.concatenate([img] * 2)) / 2
         if self.applyMask and hasattr(ans, "mask"):
             ans[ans.mask] = np.nan
         return ans
@@ -209,11 +207,13 @@ class PatternViewerShortcuts:
             self.bookmarks["0"] = pv.currentDataset.rawIndex, pv.rotation
             pv.currentDataset.selectRandomly()
         elif text == "-":
-            d = self._gears["-"].getSpeed()
-            pv.rotationSlider.setValue((pv.rotationSlider.value() - d) % 360)
+            pv.setRotation((pv.rotation - self._gears["-"].getSpeed()) % 360)
+            # d = self._gears["-"].getSpeed()
+            # pv.rotationSlider.setValue((pv.rotationSlider.value() - d) % 360)
         elif text == "=":
-            d = self._gears["="].getSpeed()
-            pv.rotationSlider.setValue((pv.rotationSlider.value() + d) % 360)
+            pv.setRotation((pv.rotation + self._gears["="].getSpeed()) % 360)
+            # d = self._gears["="].getSpeed()
+            # pv.rotationSlider.setValue((pv.rotationSlider.value() + d) % 360)
         elif text  == "a":
             pv.dataset2.addPattern(pv.currentDataset.rawIndex)
         elif text  == "x":
@@ -231,9 +231,12 @@ class PatternViewerShortcuts:
 
 
 class PatternViewer(QtWidgets.QMainWindow):
+    rotationChanged = QtCore.pyqtSignal(int)
+
     def __init__(self, datasets, parent=None):
         super().__init__(parent=parent)
-        self.rotation = 0
+        self._rotation = 0
+        self._protectRotation = False
         self.datasets = datasets
         self.initUI()
         self._currentDatasetName = self.currentDatasetBox.currentText()
@@ -241,7 +244,7 @@ class PatternViewer(QtWidgets.QMainWindow):
         self._imageInit = True
         if len(self.datasets) > 0:
             self._setCurrentDataset(self.currentDatasetBox.currentText())
-            self.updateRotation(self.rotation)
+            self.setRotation(self.rotation)
         self.shortcuts = PatternViewerShortcuts()
 
     @property
@@ -263,11 +266,12 @@ class PatternViewer(QtWidgets.QMainWindow):
         self.infoLabel.setAlignment(QtCore.Qt.AlignTop)
         self.infoLabel.setStyleSheet("color:#888888;")
         self.infoLabel.move(10, 10)
+        self.infoLabel.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
         grid.addWidget(self.imageViewer, 0, 0, 1, 2)
 
-        self.indexGroup = QtWidgets.QGroupBox("Index")
+        self.datasetGroup = QtWidgets.QGroupBox("Index")
         hbox = QtWidgets.QHBoxLayout()
-        self.indexGroup.setLayout(hbox)
+        self.datasetGroup.setLayout(hbox)
         self.patternSelectSpinBox = QtWidgets.QSpinBox(self)
         self.patternSlider = QtWidgets.QSlider(
             QtCore.Qt.Orientation.Horizontal, parent=self
@@ -287,7 +291,7 @@ class PatternViewer(QtWidgets.QMainWindow):
         hbox.addWidget(self.patternNumberLabel)
         hbox.addWidget(self.patternSlider)
         hbox.addWidget(self.dataset2Box)
-        grid.addWidget(self.indexGroup, 1, 0, 1, 1)
+        grid.addWidget(self.datasetGroup, 1, 0, 1, 1)
 
         self.imageGroup = QtWidgets.QGroupBox("Image")
         igLayout = QtWidgets.QGridLayout()
@@ -297,7 +301,12 @@ class PatternViewer(QtWidgets.QMainWindow):
         self.rotationSlider.setMinimum(0)
         self.rotationSlider.setMaximum(359)
         self.rotationSlider.setValue(0)
-        self.rotationSlider.valueChanged.connect(self.updateRotation)
+        self.rotationSlider.valueChanged.connect(self.setRotation)
+        self.rotationChanged.connect(self.rotationSlider.setValue)
+        self.rotationChanged.connect(
+            lambda r: self.updateImage(self.currentDataset.getSelection())
+        )
+
         igLayout.addWidget(QtWidgets.QLabel("rotation"), 0, 0)
         igLayout.addWidget(self.rotationSlider, 0, 1, 1, 3)
 
@@ -372,9 +381,17 @@ class PatternViewer(QtWidgets.QMainWindow):
         self.patternNumberLabel.setText(f"/{numData}")
         self.patternSlider.setValue(0)
 
-    def updateRotation(self, angle):
-        self.rotation = angle
-        self.updateImage(self.currentDataset.getSelection())
+    @property
+    def rotation(self):
+        return self._rotation
+
+    def setRotation(self, r):
+        if self._protectRotation:
+            return
+        self._protectRotation = True
+        self._rotation = r
+        self.rotationChanged.emit(r)
+        self._protectRotation = False
 
     def updateImage(self, img):
         sx, sy = img.shape
@@ -384,9 +401,13 @@ class PatternViewer(QtWidgets.QMainWindow):
         tr.scale((x1 - x0) / sx, (y1 - y0) / sy)
         tr.translate(x0 - 0.5, y0 - 0.5)
         s = self.currentDataset.patterns[self.currentDataset.rawIndex].sum()
-        self.indexGroup.setTitle(
-            f"index: {self.currentDataset.rawIndex:06d}/{self.currentDataset.patterns.shape[0]:06d} sum: {s}"
+        self.infoLabel.setText(
+            f"dataset: {self._currentDatasetName}\n"
+            f"index: {self.currentDataset.rawIndex:06d}/{self.currentDataset.patterns.shape[0]:06d}\n"
+            f"sum: {s}\n"
+            f"rotation: {self.rotationSlider.value()}°"
         )
+        self.infoLabel.adjustSize()
         if self._imageInit:
             self.imageViewer.setImage(img, transform=tr)
             self._imageInit = False
