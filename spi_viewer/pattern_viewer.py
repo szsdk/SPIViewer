@@ -159,10 +159,10 @@ class PatternDataModel(QtCore.QObject):
 class PatternViewerShortcuts:
     def __init__(self):
         self._gears = {
-            "n": utils.Gear([100, 10, 1], [0.1, 0.5]),
-            "p": utils.Gear([100, 10, 1], [0.1, 0.5]),
-            "-": utils.Gear([5, 1], [0.2]),
-            "=": utils.Gear([5, 1], [0.2]),
+            "nextPattern": utils.Gear([100, 10, 1], [0.1, 0.5]),
+            "previousPattern": utils.Gear([100, 10, 1], [0.1, 0.5]),
+            "left": utils.Gear([5, 1], [0.2]),
+            "right": utils.Gear([5, 1], [0.2]),
         }
         self.bookmarks = dict()
         self._marking = False
@@ -197,23 +197,27 @@ class PatternViewerShortcuts:
         key = event.key()
         if text == "m":
             self._marking = True
-        elif text == "n":
+        elif text == "l":
             self.bookmarks["0"] = pv.currentDataset.rawIndex, pv.rotation
-            pv.currentDataset.selectNext(d=self._gears["n"].getSpeed())
-        elif text == "p":
+            pv.currentDataset.selectNext(d=self._gears["nextPattern"].getSpeed())
+        elif text == "h":
             self.bookmarks["0"] = pv.currentDataset.rawIndex, pv.rotation
-            pv.currentDataset.selectPrevious(d=self._gears["p"].getSpeed())
+            pv.currentDataset.selectPrevious(d=self._gears["previousPattern"].getSpeed())
+        elif text == "j":
+            self.bookmarks["0"] = pv.currentDataset.rawIndex, pv.rotation
+            c = pv.currentDatasetBox
+            c.setCurrentIndex((c.currentIndex() + 1) % c.count())
+        elif text == "k":
+            self.bookmarks["0"] = pv.currentDataset.rawIndex, pv.rotation
+            c = pv.currentDatasetBox
+            c.setCurrentIndex((c.currentIndex() - 1) % c.count())
         elif text == "r":
             self.bookmarks["0"] = pv.currentDataset.rawIndex, pv.rotation
             pv.currentDataset.selectRandomly()
         elif text == "-":
-            pv.setRotation((pv.rotation - self._gears["-"].getSpeed()) % 360)
-            # d = self._gears["-"].getSpeed()
-            # pv.rotationSlider.setValue((pv.rotationSlider.value() - d) % 360)
+            pv.setRotation((pv.rotation - self._gears["left"].getSpeed()) % 360)
         elif text == "=":
-            pv.setRotation((pv.rotation + self._gears["="].getSpeed()) % 360)
-            # d = self._gears["="].getSpeed()
-            # pv.rotationSlider.setValue((pv.rotationSlider.value() + d) % 360)
+            pv.setRotation((pv.rotation + self._gears["right"].getSpeed()) % 360)
         elif text == "a":
             pv.dataset2.addPattern(pv.currentDataset.rawIndex)
         elif text == "x":
@@ -267,7 +271,7 @@ class PatternViewer(QtWidgets.QMainWindow):
         self.infoLabel.setStyleSheet("color:#888888;")
         self.infoLabel.move(10, 10)
         self.infoLabel.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
-        grid.addWidget(self.imageViewer, 0, 0, 1, 2)
+        grid.addWidget(self.imageViewer, 1, 0, 1, 2)
 
         self.datasetGroup = QtWidgets.QGroupBox("Index")
         hbox = QtWidgets.QHBoxLayout()
@@ -293,7 +297,7 @@ class PatternViewer(QtWidgets.QMainWindow):
         hbox.addWidget(self.patternNumberLabel)
         hbox.addWidget(self.patternSlider)
         hbox.addWidget(self.dataset2Box)
-        grid.addWidget(self.datasetGroup, 1, 0, 1, 1)
+        grid.addWidget(self.datasetGroup, 2, 0, 1, 1)
 
         self.imageGroup = QtWidgets.QGroupBox("Image")
         igLayout = QtWidgets.QGridLayout()
@@ -339,7 +343,7 @@ class PatternViewer(QtWidgets.QMainWindow):
         igLayout.addWidget(self.colormapBox, 1, 1)
 
         self.imageGroup.setLayout(igLayout)
-        grid.addWidget(self.imageGroup, 2, 0)
+        grid.addWidget(self.imageGroup, 3, 0)
 
         self.setCentralWidget(QtWidgets.QWidget(parent=self))
         self.centralWidget().setLayout(grid)

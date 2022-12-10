@@ -55,15 +55,15 @@ w = PatternViewer(
 
 w.show()
 
-btn = QtWidgets.QPushButton("ff")
-btn.clicked.connect(
-    # lambda: w.removeDataset("a")
-    lambda: w.setDataset("b", PatternDataModel(
-            patterns,
-            detector=det,
-            selectedList=np.arange(11, 30)
-        ))
-)
-btn.show()
+# btn = QtWidgets.QPushButton("ff")
+# btn.clicked.connect(
+#     # lambda: w.removeDataset("a")
+#     lambda: w.setDataset("b", PatternDataModel(
+#             patterns,
+#             detector=det,
+#             selectedList=np.arange(11, 30)
+#         ))
+# )
+# btn.show()
 
 pg.exec()
