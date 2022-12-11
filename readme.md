@@ -1,6 +1,8 @@
 # SPI Viewer
 
 ## Shortcuts
+- `esc`
+- `g`
 - `h`, `j`, `k`, `l`
 - `-`, `=`
 - `m1`, ..., `m9`
