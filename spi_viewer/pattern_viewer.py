@@ -156,6 +156,25 @@ class PatternDataModel(QtCore.QObject):
         return len(self.selectedList)
 
 
+class InformationLabel(QtWidgets.QLabel):
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+        self._information = dict()
+
+    def update(self, info):
+        self._information.update(info)
+        self._updateText()
+
+    def _updateText(self):
+        text = []
+        for k, v in self._information.items():
+            if v is None:
+                continue
+            text.append(f"{k}: {v}")
+        self.setText("\n".join(text))
+        self.adjustSize()
+
+
 class PatternViewerShortcuts:
     def __init__(self):
         self._gears = {
@@ -250,6 +269,9 @@ class PatternViewer(QtWidgets.QMainWindow):
         self._rotation = 0
         self._protectRotation = False
         self.datasets = datasets
+        self._transform = None
+        self._transformInverted = None
+        self._currentImage = None
         self.initUI()
         self._currentDatasetName = self.currentDatasetBox.currentText()
         self._dataset2Name = self.dataset2Box.currentText()
@@ -274,7 +296,8 @@ class PatternViewer(QtWidgets.QMainWindow):
         grid = QtWidgets.QGridLayout()
 
         self.imageViewer = pg.ImageView()
-        self.infoLabel = QtWidgets.QLabel("info", parent=self.imageViewer)
+        self.imageViewer.scene.sigMouseMoved.connect(self.mouseMovedEvent)
+        self.infoLabel = InformationLabel(parent=self.imageViewer)
         self.infoLabel.setAlignment(QtCore.Qt.AlignTop)
         self.infoLabel.setStyleSheet("color:#888888;")
         self.infoLabel.move(10, 10)
@@ -362,6 +385,33 @@ class PatternViewer(QtWidgets.QMainWindow):
         openAction = fileMenu.addAction("&Open")
         openAction.triggered.connect(lambda: print("NotImplemented"))
 
+    def mouseMovedEvent(self, pos):
+        if self._currentImage is None:
+            return
+        mousePoint = self.imageViewer.view.mapSceneToView(pos)
+        x, y = self._transformInverted.map(mousePoint.x(), mousePoint.y())
+        x_i = round(x)
+        y_i = round(y)
+        if (
+            x_i >= 0
+            and x_i < self._currentImage.shape[0]
+            and y_i >= 0
+            and y_i < self._currentImage.shape[1]
+        ):
+            v = self._currentImage[x_i, y_i]
+            if np.isfinite(v):
+                vstr = f"{v:.3f}"
+            else:
+                vstr = str(v)
+            self.infoLabel.update(
+                {
+                    "position": f"({x:.2f}, {y:.2f})",
+                    "value": vstr,
+                }
+            )
+        else:
+            self.infoLabel.update({"position": None, "value": None})
+
     def setDataset(self, name, d):
         needUpdate = name in self.datasets
         self.datasets[name] = d
@@ -438,14 +488,18 @@ class PatternViewer(QtWidgets.QMainWindow):
         tr.rotate(self.rotation)
         tr.scale((x1 - x0) / sx, (y1 - y0) / sy)
         tr.translate(x0 - 0.5, y0 - 0.5)
+        self._transform = tr
+        self._transformInverted = tr.inverted()[0]
         s = self.currentDataset.patterns[self.currentDataset.rawIndex].sum()
-        self.infoLabel.setText(
-            f"dataset: {self._currentDatasetName}\n"
-            f"index: {self.currentDataset.rawIndex:06d}/{self.currentDataset.patterns.shape[0]:06d}\n"
-            f"sum: {s}\n"
-            f"rotation: {self.rotationSlider.value()}°"
+        self.infoLabel.update(
+            {
+                "dataset": self._currentDatasetName,
+                "index": f"{self.currentDataset.rawIndex:06d}/{self.currentDataset.patterns.shape[0]:06d}",
+                "sum": s,
+                "rotation": f"{self.rotationSlider.value()}°",
+            }
         )
-        self.infoLabel.adjustSize()
+        self._currentImage = img
         if self._imageInit:
             self.imageViewer.setImage(img, transform=tr)
             self._imageInit = False
@@ -465,7 +519,9 @@ def patternViewer(src, detector=None):
             src if isinstance(src, ef.PatternsSOneEMC) else ef.PatternsSOneEMC(src)
         )
         detector = ef.detector(detector)
-        datasets = {"(default)": PatternDataModel(pattern, detector=detector, modify=False)}
+        datasets = {
+            "(default)": PatternDataModel(pattern, detector=detector, modify=False)
+        }
     else:
         datasets = {
             k: v if isinstance(v, PatternDataModel) else PatternDataModel(**v)
