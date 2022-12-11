@@ -1,21 +1,20 @@
 import logging
-
 from rich.logging import RichHandler
-# logging.basicConfig(format='%(asctime)s %(message)s')
-
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(message)s", handlers=[RichHandler()])
-# logging.info("rich logging")
 
 import numpy as np
 import pyqtgraph as pg
 import emcfile as ef
 from pyqtgraph.Qt import QtWidgets
-from spi_viewer.pattern_viewer import PatternDataModel, PatternViewer
+from spi_viewer.pattern_viewer import PatternDataModel, PatternViewer, patternViewer
+
+logging.basicConfig(
+    level=logging.DEBUG, format="%(asctime)s %(message)s", handlers=[RichHandler()]
+)
 
 
 def fake_detector(s, detd, beamstop):
     xy = (
-        np.array(np.meshgrid(*(np.linspace(-13, 13, s, endpoint=True),)*2))
+        np.array(np.meshgrid(*(np.linspace(-13, 13, s, endpoint=True),) * 2))
         .reshape(2, -1)
         .T
     )
@@ -37,19 +36,14 @@ patterns[:, det.mask == 2] = 0
 patterns = ef.patterns(patterns)
 
 app = QtWidgets.QApplication([])
-pd = PatternDataModel(
-    patterns,
-    detector=det,
-    modify=False
-)
-w = PatternViewer(
+# w = patternViewer(
+#     "/Users/sz/NeoEMC/data/photons.emc", detector="/Users/sz/NeoEMC/data/det_sim.dat"
+# )
+pd = PatternDataModel(patterns, detector=det, modify=False)
+w = patternViewer(
     {
         "(default)": pd,
-        "a": PatternDataModel(
-            patterns,
-            detector=det,
-            selectedList=np.arange(11)
-        )
+        "a": PatternDataModel(patterns, detector=det, selectedList=np.arange(11)),
     }
 )
 

@@ -208,7 +208,9 @@ class PatternViewerShortcuts:
             pv.currentDataset.selectNext(d=self._gears["nextPattern"].getSpeed())
         elif text == "h":
             self.bookmarks["0"] = pv.currentDataset.rawIndex, pv.rotation
-            pv.currentDataset.selectPrevious(d=self._gears["previousPattern"].getSpeed())
+            pv.currentDataset.selectPrevious(
+                d=self._gears["previousPattern"].getSpeed()
+            )
         elif text == "j":
             self.bookmarks["0"] = pv.currentDataset.rawIndex, pv.rotation
             c = pv.currentDatasetBox
@@ -455,3 +457,18 @@ class PatternViewer(QtWidgets.QMainWindow):
                 autoHistogramRange=False,
                 autoLevels=False,
             )
+
+
+def patternViewer(src, detector=None):
+    if detector is not None:
+        pattern = (
+            src if isinstance(src, ef.PatternsSOneEMC) else ef.PatternsSOneEMC(src)
+        )
+        detector = ef.detector(detector)
+        datasets = {"(default)": PatternDataModel(pattern, detector=detector, modify=False)}
+    else:
+        datasets = {
+            k: v if isinstance(v, PatternDataModel) else PatternDataModel(**v)
+            for k, v in src.items()
+        }
+    return PatternViewer(datasets)
