@@ -1,12 +1,14 @@
 import logging
+
 import emcfile as ef
+import matplotlib.pyplot as plt
 import numpy as np
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
-import matplotlib.pyplot as plt
+from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
+
 from . import utils
-from ._pattern_data_model import PatternDataModel
 from ._angular_statistic_viewer import AngularStatisticViewer
+from ._pattern_data_model import PatternDataModel
 
 __all__ = [
     "PatternDataModel",
@@ -72,7 +74,6 @@ class PatternViewerShortcuts:
             if rawIndex not in pv.currentDataset.selectedList:
                 pv.currentDataset.selectByRawIndex(rawIndex)
             else:
-                index = np.where(pv.currentDataset.selectedList == rawIndex)[0][0]
                 pv.currentDataset.select(rawIndex)
             pv.rotationSlider.setValue(rotation)
             return
@@ -328,9 +329,7 @@ class PatternViewer(QtWidgets.QMainWindow):
             lambda idx: self.patternSlider.setValue(idx)
         )
         self.currentDataset.selected.connect(
-            lambda idx: self.setImage(
-                self.currentDataset.getSelection()
-            )
+            lambda idx: self.setImage(self.currentDataset.getSelection())
         )
         self.currentDataset.selectedListChanged.connect(self.updatePatternRange)
         self.updatePatternRange()
