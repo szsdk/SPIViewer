@@ -1,3 +1,4 @@
+import logging
 import emcfile as ef
 import operator
 import numpy as np
@@ -6,7 +7,7 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 import matplotlib.pyplot as plt
 from . import utils
-import logging
+from ._ang_binned_statistic import ang_binned_statistic
 
 __all__ = [
     "PatternDataModel",
@@ -31,7 +32,7 @@ def _symmetrizedDetr(det, symmetrize):
 
 
 class PatternDataModel(QtCore.QObject):
-    selected = QtCore.pyqtSignal(np.ndarray)
+    selected = QtCore.pyqtSignal(int)
     selectedListChanged = QtCore.pyqtSignal()
 
     def __init__(
@@ -120,7 +121,8 @@ class PatternDataModel(QtCore.QObject):
     def selectByRawIndex(self, rawIndex):
         self._rawIndex = rawIndex
         self._protectIndex = True
-        self.selected.emit(self.getSelection())
+        # self.selected.emit(self.getSelection())
+        self.selected.emit(self.index)
         self._protectIndex = False
 
     def selectNext(self, d: int = 1):
@@ -261,6 +263,28 @@ class PatternViewerShortcuts:
             event.ignore()
 
 
+class AngularStatisticViewer(pg.PlotWidget):
+    def __init__(self, dm: PatternDataModel, bins=10, parent=None):
+        super().__init__(parent=parent)
+        self._dm = dm
+        self.dataLine = pg.PlotDataItem()
+        self.addItem(self.dataLine)
+        self.bins = bins
+        self._dm.selected.connect(self.updatePlot)
+        self.updatePlot(self._dm.index)
+
+    def updatePlot(self, idx):
+        ans = ang_binned_statistic(
+            self._dm.patterns[idx],
+            self._dm.detector,
+            bins=self.bins
+        )
+        self.dataLine.setData(
+            (ans.bin_edges[:-1] + ans.bin_edges[1:])/2,
+            ans.statistic
+        )
+
+
 class PatternViewer(QtWidgets.QMainWindow):
     rotationChanged = QtCore.pyqtSignal(int)
 
@@ -384,6 +408,13 @@ class PatternViewer(QtWidgets.QMainWindow):
         fileMenu = self.menuBar.addMenu("&File")
         openAction = fileMenu.addAction("&Open")
         openAction.triggered.connect(lambda: print("NotImplemented"))
+        analysisMenu = self.menuBar.addMenu("&Analysis")
+        angularStatisticAction = analysisMenu.addAction("Angular statistic")
+        angularStatisticAction.triggered.connect(self._angularStatistic)
+
+    def _angularStatistic(self):
+        self.angularStatistic = AngularStatisticViewer(self.currentDataset)
+        self.angularStatistic.show()
 
     def mouseMovedEvent(self, pos):
         if self._currentImage is None:
@@ -449,12 +480,16 @@ class PatternViewer(QtWidgets.QMainWindow):
         self._currentDatasetName = sl
         pidx = self.currentDataset.index
         self.currentDataset.selected.connect(
-            lambda a: self.patternIndexSpinBox.setValue(self.currentDataset.index)
+            lambda idx: self.patternIndexSpinBox.setValue(idx)
         )
         self.currentDataset.selected.connect(
-            lambda a: self.patternSlider.setValue(self.currentDataset.index)
+            lambda idx: self.patternSlider.setValue(idx)
         )
-        self.currentDataset.selected.connect(self.setImage)
+        self.currentDataset.selected.connect(
+            lambda idx: self.setImage(
+                self.currentDataset.getSelection()
+            )
+        )
         self.currentDataset.selectedListChanged.connect(self.updatePatternRange)
         self.updatePatternRange()
         self.currentDataset.select(pidx)
