@@ -121,7 +121,6 @@ class PatternDataModel(QtCore.QObject):
     def selectByRawIndex(self, rawIndex):
         self._rawIndex = rawIndex
         self._protectIndex = True
-        # self.selected.emit(self.getSelection())
         self.selected.emit(self.index)
         self._protectIndex = False
 
@@ -266,17 +265,15 @@ class PatternViewerShortcuts:
 class AngularStatisticViewer(pg.PlotWidget):
     def __init__(self, dm: PatternDataModel, bins=10, parent=None):
         super().__init__(parent=parent)
-        self._dm = dm
         self.dataLine = pg.PlotDataItem()
         self.addItem(self.dataLine)
         self.bins = bins
-        self._dm.selected.connect(self.updatePlot)
-        self.updatePlot(self._dm.index)
 
-    def updatePlot(self, idx):
+    def updatePlot(self, pv):
+        dm = pv.currentDataset
         ans = ang_binned_statistic(
-            self._dm.patterns[idx],
-            self._dm.detector,
+            dm.patterns[dm.index],
+            dm.detector,
             bins=self.bins
         )
         self.dataLine.setData(
@@ -287,6 +284,7 @@ class AngularStatisticViewer(pg.PlotWidget):
 
 class PatternViewer(QtWidgets.QMainWindow):
     rotationChanged = QtCore.pyqtSignal(int)
+    currentImageChanged = QtCore.pyqtSignal(object)
 
     def __init__(self, datasets, parent=None):
         super().__init__(parent=parent)
@@ -299,11 +297,13 @@ class PatternViewer(QtWidgets.QMainWindow):
         self.initUI()
         self._currentDatasetName = self.currentDatasetBox.currentText()
         self._dataset2Name = self.dataset2Box.currentText()
-        self._imageInit = True
+        self._imageInitialized = True
         if len(self.datasets) > 0:
             self._setCurrentDataset(self.currentDatasetBox.currentText())
             self.setRotation(self.rotation)
         self.shortcuts = PatternViewerShortcuts()
+
+        self.angularStatisticViewer = None
 
     @property
     def currentDataset(self):
@@ -413,8 +413,11 @@ class PatternViewer(QtWidgets.QMainWindow):
         angularStatisticAction.triggered.connect(self._angularStatistic)
 
     def _angularStatistic(self):
-        self.angularStatistic = AngularStatisticViewer(self.currentDataset)
-        self.angularStatistic.show()
+        if self.angularStatisticViewer is None:
+            self.angularStatisticViewer = AngularStatisticViewer(self.currentDataset)
+            self.currentImageChanged.connect(self.angularStatisticViewer.updatePlot)
+        self.angularStatisticViewer.show()
+        self.currentImageChanged.emit(self)
 
     def mouseMovedEvent(self, pos):
         if self._currentImage is None:
@@ -535,9 +538,9 @@ class PatternViewer(QtWidgets.QMainWindow):
             }
         )
         self._currentImage = img
-        if self._imageInit:
+        if self._imageInitialized:
             self.imageViewer.setImage(img, transform=tr)
-            self._imageInit = False
+            self._imageInitialized = False
         else:
             self.imageViewer.setImage(
                 img,
@@ -546,6 +549,7 @@ class PatternViewer(QtWidgets.QMainWindow):
                 autoHistogramRange=False,
                 autoLevels=False,
             )
+        self.currentImageChanged.emit(self)
 
 
 def patternViewer(src, detector=None):
