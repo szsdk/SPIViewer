@@ -1,3 +1,4 @@
+from typing import Optional
 import logging
 from pathlib import Path
 
@@ -6,10 +7,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
+from pyqtgraph.Qt.QtWidgets import QMessageBox
 
 from . import utils
 from ._angular_statistic_viewer import AngularStatisticViewer
-from ._pattern_data_model import PatternDataModel
+from ._pattern_data_model import PatternDataModel, NullPatternDataModel
 
 __all__ = [
     "PatternDataModel",
@@ -117,11 +119,22 @@ class PatternViewerShortcuts:
             idx = pv.currentDataset.rawIndex
             pv.currentDataset.removePattern(pv.currentDataset.rawIndex)
             pv.dataset2.addPattern(idx)
+        elif text == "d":
+            ret = QMessageBox.question(
+                pv,
+                'MessageBox',
+                f"Are you sure you want to delete the dataset [{pv.currentDatasetName}]?",
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+            )
+            if ret == QMessageBox.Yes:
+                pv.removeDataset()
         elif text in self._custom:
             self._custom[text]()
         else:
             event.ignore()
 
+
+nullPatternDataModel = NullPatternDataModel()
 
 class PatternViewer(QtWidgets.QMainWindow):
     rotationChanged = QtCore.pyqtSignal(int)
@@ -148,7 +161,11 @@ class PatternViewer(QtWidgets.QMainWindow):
 
     @property
     def currentDataset(self):
-        return self.datasets[self._currentDatasetName]
+        return self.datasets.get(self.currentDatasetName, nullPatternDataModel)
+
+    @property
+    def currentDatasetName(self):
+        return self._currentDatasetName
 
     @property
     def dataset2(self):
@@ -282,7 +299,7 @@ class PatternViewer(QtWidgets.QMainWindow):
                 vstr = str(v)
             self.infoLabel.update(
                 {
-                    "position": f"({x:.2f}, {y:.2f})",
+                    "position": f"({mousePoint.x():.2f}, {mousePoint.y():.2f})",
                     "value": vstr,
                 }
             )
@@ -297,21 +314,25 @@ class PatternViewer(QtWidgets.QMainWindow):
         if needUpdate:
             self._setCurrentDataset(name)
 
-    def removeDataset(self, name):
+    def removeDataset(self, name=None):
+        if name is None:
+            name = self.currentDatasetName
         if name not in self.datasets:
             return
         index = self.currentDatasetBox.findText(name)  # find the index of text
         self.currentDatasetBox.removeItem(index)
         index = self.dataset2Box.findText(name)  # find the index of text
         self.dataset2Box.removeItem(index)
+        self.datasets.pop(name)
+
         if len(self.datasets) == 0:
-            raise NotADirectoryError()
-        if name == self._currentDatasetName:
+            self._setCurrentDataset("")
+        elif name == self.currentDatasetName:
             self._setCurrentDataset(next(self.datasets.keys()))
 
     def switchDatasets(self):
         t = self._dataset2Name
-        self.dataset2Box.setCurrentText(self._currentDatasetName)
+        self.dataset2Box.setCurrentText(self.currentDatasetName)
         self.currentDatasetBox.setCurrentText(t)
 
     def _setDataset2(self, sl: str):
@@ -324,7 +345,15 @@ class PatternViewer(QtWidgets.QMainWindow):
         except:
             pass
         self._currentDatasetName = sl
+        self.updatePatternRange()
         pidx = self.currentDataset.index
+        self.symmetrizeCheckBox.setChecked(self.currentDataset.symmetrize)
+        self.applyMaskCheckBox.setChecked(self.currentDataset.applyMask)
+
+        if sl == "":
+            self.setImage(None)
+            return
+
         self.currentDataset.selected.connect(
             lambda idx: self.patternIndexSpinBox.setValue(idx)
         )
@@ -335,10 +364,8 @@ class PatternViewer(QtWidgets.QMainWindow):
             lambda idx: self.setImage(self.currentDataset.getSelection())
         )
         self.currentDataset.selectedListChanged.connect(self.updatePatternRange)
-        self.updatePatternRange()
+
         self.currentDataset.select(pidx)
-        self.symmetrizeCheckBox.setChecked(self.currentDataset.symmetrize)
-        self.applyMaskCheckBox.setChecked(self.currentDataset.applyMask)
 
     def updatePatternRange(self):
         numData = len(self.currentDataset)
@@ -360,7 +387,20 @@ class PatternViewer(QtWidgets.QMainWindow):
         self.rotationChanged.emit(r)
         self._protectRotation = False
 
-    def setImage(self, img):
+    def setImage(self, img: Optional[np.ndarray]):
+        s = self.currentDataset.patterns[self.currentDataset.rawIndex].sum()
+        self.infoLabel.update(
+            {
+                "dataset": self.currentDatasetName,
+                "index": f"{self.currentDataset.rawIndex:06d}/{self.currentDataset.patterns.shape[0]:06d}",
+                "sum": s,
+                "rotation": f"{self.rotationSlider.value()}°",
+            }
+        )
+        self._currentImage = img
+        if img is None:
+            self.imageViewer.clear()
+            return
         sx, sy = img.shape
         x0, x1, y0, y1 = self.currentDataset.detectorRender.frame_extent()
         tr = QtGui.QTransform()
@@ -369,16 +409,6 @@ class PatternViewer(QtWidgets.QMainWindow):
         tr.translate(x0 - 0.5, y0 - 0.5)
         self._transform = tr
         self._transformInverted = tr.inverted()[0]
-        s = self.currentDataset.patterns[self.currentDataset.rawIndex].sum()
-        self.infoLabel.update(
-            {
-                "dataset": self._currentDatasetName,
-                "index": f"{self.currentDataset.rawIndex:06d}/{self.currentDataset.patterns.shape[0]:06d}",
-                "sum": s,
-                "rotation": f"{self.rotationSlider.value()}°",
-            }
-        )
-        self._currentImage = img
         if self._imageInitialized:
             self.imageViewer.setImage(img, transform=tr)
             self._imageInitialized = False
