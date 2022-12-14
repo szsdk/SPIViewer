@@ -1,11 +1,10 @@
 from collections import namedtuple
 from typing import List, Optional, Union, cast
 
+import emcfile as ef
 import numpy as np
 from scipy.sparse import coo_matrix
 from scipy.stats import binned_statistic
-
-import emcfile as ef
 
 __all__ = ["ang_binned_statistic"]
 

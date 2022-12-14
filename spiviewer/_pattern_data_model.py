@@ -1,6 +1,7 @@
-import emcfile as ef
 import operator
+
 import cachetools
+import emcfile as ef
 import numpy as np
 from pyqtgraph.Qt import QtCore
 
@@ -17,7 +18,6 @@ def _symmetrizedDetr(det, symmetrize):
         dd["mask"] = np.concatenate([dd["mask"]] * 2)
         new_det = ef.detector(**dd)
     return ef.det_render(new_det)
-
 
 
 class PatternDataModel(QtCore.QObject):
@@ -144,5 +144,3 @@ class PatternDataModel(QtCore.QObject):
 
     def __len__(self):
         return len(self.selectedList)
-
-

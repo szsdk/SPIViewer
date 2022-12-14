@@ -1,11 +1,12 @@
 import logging
-from rich.logging import RichHandler
 
+import emcfile as ef
 import numpy as np
 import pyqtgraph as pg
-import emcfile as ef
 from pyqtgraph.Qt import QtWidgets
-from spi_viewer.pattern_viewer import PatternDataModel, PatternViewer, patternViewer
+from rich.logging import RichHandler
+
+from spiviewer.pattern_viewer import PatternDataModel, PatternViewer, patternViewer
 
 logging.basicConfig(
     level=logging.DEBUG, format="%(asctime)s %(message)s", handlers=[RichHandler()]
@@ -40,13 +41,13 @@ app = QtWidgets.QApplication([])
 #     "/Users/sz/NeoEMC/data/photons.emc", detector="/Users/sz/NeoEMC/data/det_sim.dat"
 # )
 pd = PatternDataModel(patterns, detector=det, modify=False)
-# w = patternViewer(
-#     {
-#         "(default)": pd,
-#         "a": PatternDataModel(patterns, detector=det, selectedList=np.arange(11)),
-#     }
-# )
-w = patternViewer("/u/szsdk/NeoEMC/data/photons.emc", "/u/szsdk/NeoEMC/data/det_sim.dat")
+w = patternViewer(
+    {
+        "(default)": pd,
+        "a": PatternDataModel(patterns, detector=det, selectedList=np.arange(11)),
+    }
+)
+# w = patternViewer("/u/szsdk/NeoEMC/data/photons.emc", "/u/szsdk/NeoEMC/data/det_sim.dat")
 
 w.show()
 
