@@ -10,10 +10,11 @@ class AngularStatisticViewer(pg.PlotWidget):
         self.dataLine = pg.PlotDataItem()
         self.addItem(self.dataLine)
         self.bins = bins
+        self.setLabel("bottom", "q/pixel")
 
     def updatePlot(self, pv):
         dm = pv.currentDataset
-        ans = ang_binned_statistic(dm.patterns[dm.index], dm.detector, bins=self.bins)
+        ans = ang_binned_statistic(dm.patterns[dm.rawIndex], dm.detector, bins=self.bins)
         self.dataLine.setData(
             (ans.bin_edges[:-1] + ans.bin_edges[1:]) / 2, ans.statistic
         )

@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 
 import emcfile as ef
 import matplotlib.pyplot as plt
@@ -85,12 +86,12 @@ class PatternViewerShortcuts:
             pv.patternIndexSpinBox.setFocus()
         elif text == "l":
             self.bookmarks["0"] = pv.currentDataset.rawIndex, pv.rotation
-            pv.currentDataset.selectNext(d=self._gears["nextPattern"].getSpeed())
+            pv.currentDataset.selectNext(
+                d=self._gears["nextPattern"].getSpeed())
         elif text == "h":
             self.bookmarks["0"] = pv.currentDataset.rawIndex, pv.rotation
             pv.currentDataset.selectPrevious(
-                d=self._gears["previousPattern"].getSpeed()
-            )
+                d=self._gears["previousPattern"].getSpeed())
         elif text == "j":
             self.bookmarks["0"] = pv.currentDataset.rawIndex, pv.rotation
             c = pv.currentDatasetBox
@@ -103,9 +104,11 @@ class PatternViewerShortcuts:
             self.bookmarks["0"] = pv.currentDataset.rawIndex, pv.rotation
             pv.currentDataset.selectRandomly()
         elif text == "-":
-            pv.setRotation((pv.rotation - self._gears["left"].getSpeed()) % 360)
+            pv.setRotation(
+                (pv.rotation - self._gears["left"].getSpeed()) % 360)
         elif text == "=":
-            pv.setRotation((pv.rotation + self._gears["right"].getSpeed()) % 360)
+            pv.setRotation(
+                (pv.rotation + self._gears["right"].getSpeed()) % 360)
         elif text == "a":
             pv.dataset2.addPattern(pv.currentDataset.rawIndex)
         elif text == "x":
@@ -173,16 +176,16 @@ class PatternViewer(QtWidgets.QMainWindow):
         self.datasetGroup.setLayout(hbox)
         self.patternIndexSpinBox = QtWidgets.QSpinBox(self)
         self.patternSlider = QtWidgets.QSlider(
-            QtCore.Qt.Orientation.Horizontal, parent=self
-        )
+            QtCore.Qt.Orientation.Horizontal, parent=self)
         self.patternNumberLabel = QtWidgets.QLabel()
         self.currentDatasetBox = QtWidgets.QComboBox(parent=self)
         self.currentDatasetBox.addItems(self.datasets.keys())
-        self.currentDatasetBox.currentTextChanged.connect(self._setCurrentDataset)
+        self.currentDatasetBox.currentTextChanged.connect(
+            self._setCurrentDataset)
         self.patternIndexSpinBox.valueChanged.connect(
-            lambda v: self.currentDataset.select(v)
-        )
-        self.patternSlider.valueChanged.connect(lambda v: self.currentDataset.select(v))
+            lambda v: self.currentDataset.select(v))
+        self.patternSlider.valueChanged.connect(
+            lambda v: self.currentDataset.select(v))
 
         self.dataset2Box = QtWidgets.QComboBox(parent=self)
         self.dataset2Box.addItems(self.datasets.keys())
@@ -197,41 +200,35 @@ class PatternViewer(QtWidgets.QMainWindow):
         self.imageGroup = QtWidgets.QGroupBox("Image")
         igLayout = QtWidgets.QGridLayout()
         self.rotationSlider = QtWidgets.QSlider(
-            QtCore.Qt.Orientation.Horizontal, parent=self
-        )
+            QtCore.Qt.Orientation.Horizontal, parent=self)
         self.rotationSlider.setMinimum(0)
         self.rotationSlider.setMaximum(359)
         self.rotationSlider.setValue(0)
         self.rotationSlider.valueChanged.connect(self.setRotation)
         self.rotationChanged.connect(self.rotationSlider.setValue)
         self.rotationChanged.connect(
-            lambda r: self.setImage(self.currentDataset.getSelection())
-        )
+            lambda r: self.setImage(self.currentDataset.getSelection()))
 
         igLayout.addWidget(QtWidgets.QLabel("rotation"), 0, 0)
         igLayout.addWidget(self.rotationSlider, 0, 1, 1, 3)
 
         self.symmetrizeCheckBox = QtWidgets.QCheckBox("symmetrize")
         self.symmetrizeCheckBox.stateChanged.connect(
-            lambda a: self.currentDataset.setSymmetrize(
-                self.symmetrizeCheckBox.isChecked()
-            )
-        )
+            lambda a: self.currentDataset.setSymmetrize(self.symmetrizeCheckBox
+                                                        .isChecked()))
         igLayout.addWidget(self.symmetrizeCheckBox, 1, 2)
 
         self.applyMaskCheckBox = QtWidgets.QCheckBox("apply mask")
         self.applyMaskCheckBox.stateChanged.connect(
-            lambda a: self.currentDataset.setApplyMask(
-                self.applyMaskCheckBox.isChecked()
-            )
-        )
+            lambda a: self.currentDataset.setApplyMask(self.applyMaskCheckBox.
+                                                       isChecked()))
         igLayout.addWidget(self.applyMaskCheckBox, 1, 3)
 
         self.colormapBox = QtWidgets.QComboBox(parent=self)
         self.colormapBox.addItems(plt.colormaps())
         self.colormapBox.currentTextChanged.connect(
-            lambda cm: self.imageViewer.setColorMap(pg.colormap.getFromMatplotlib(cm))
-        )
+            lambda cm: self.imageViewer.setColorMap(
+                pg.colormap.getFromMatplotlib(cm)))
         self.colormapBox.setCurrentText("magma")
         self.colormapBox.currentTextChanged.emit("magma")
         igLayout.addWidget(QtWidgets.QLabel("colormap"), 1, 0)
@@ -254,8 +251,10 @@ class PatternViewer(QtWidgets.QMainWindow):
 
     def _angularStatistic(self):
         if self.angularStatisticViewer is None:
-            self.angularStatisticViewer = AngularStatisticViewer(self.currentDataset)
-            self.currentImageChanged.connect(self.angularStatisticViewer.updatePlot)
+            self.angularStatisticViewer = AngularStatisticViewer(
+                self.currentDataset, bins=51)
+            self.currentImageChanged.connect(
+                self.angularStatisticViewer.updatePlot)
         self.angularStatisticViewer.show()
         self.currentImageChanged.emit(self)
 
@@ -266,23 +265,17 @@ class PatternViewer(QtWidgets.QMainWindow):
         x, y = self._transformInverted.map(mousePoint.x(), mousePoint.y())
         x_i = round(x)
         y_i = round(y)
-        if (
-            x_i >= 0
-            and x_i < self._currentImage.shape[0]
-            and y_i >= 0
-            and y_i < self._currentImage.shape[1]
-        ):
+        if (x_i >= 0 and x_i < self._currentImage.shape[0] and y_i >= 0
+                and y_i < self._currentImage.shape[1]):
             v = self._currentImage[x_i, y_i]
             if np.isfinite(v):
                 vstr = f"{v:.3f}"
             else:
                 vstr = str(v)
-            self.infoLabel.update(
-                {
-                    "position": f"({x:.2f}, {y:.2f})",
-                    "value": vstr,
-                }
-            )
+            self.infoLabel.update({
+                "position": f"({x:.2f}, {y:.2f})",
+                "value": vstr,
+            })
         else:
             self.infoLabel.update({"position": None, "value": None})
 
@@ -323,15 +316,13 @@ class PatternViewer(QtWidgets.QMainWindow):
         self._currentDatasetName = sl
         pidx = self.currentDataset.index
         self.currentDataset.selected.connect(
-            lambda idx: self.patternIndexSpinBox.setValue(idx)
-        )
+            lambda idx: self.patternIndexSpinBox.setValue(idx))
         self.currentDataset.selected.connect(
-            lambda idx: self.patternSlider.setValue(idx)
-        )
+            lambda idx: self.patternSlider.setValue(idx))
         self.currentDataset.selected.connect(
-            lambda idx: self.setImage(self.currentDataset.getSelection())
-        )
-        self.currentDataset.selectedListChanged.connect(self.updatePatternRange)
+            lambda idx: self.setImage(self.currentDataset.getSelection()))
+        self.currentDataset.selectedListChanged.connect(
+            self.updatePatternRange)
         self.updatePatternRange()
         self.currentDataset.select(pidx)
         self.symmetrizeCheckBox.setChecked(self.currentDataset.symmetrize)
@@ -367,14 +358,13 @@ class PatternViewer(QtWidgets.QMainWindow):
         self._transform = tr
         self._transformInverted = tr.inverted()[0]
         s = self.currentDataset.patterns[self.currentDataset.rawIndex].sum()
-        self.infoLabel.update(
-            {
-                "dataset": self._currentDatasetName,
-                "index": f"{self.currentDataset.rawIndex:06d}/{self.currentDataset.patterns.shape[0]:06d}",
-                "sum": s,
-                "rotation": f"{self.rotationSlider.value()}°",
-            }
-        )
+        self.infoLabel.update({
+            "dataset": self._currentDatasetName,
+            "index":
+            f"{self.currentDataset.rawIndex:06d}/{self.currentDataset.patterns.shape[0]:06d}",
+            "sum": s,
+            "rotation": f"{self.rotationSlider.value()}°",
+        })
         self._currentImage = img
         if self._imageInitialized:
             self.imageViewer.setImage(img, transform=tr)
@@ -392,16 +382,16 @@ class PatternViewer(QtWidgets.QMainWindow):
 
 def patternViewer(src, detector=None):
     if detector is not None:
-        pattern = (
-            src if isinstance(src, ef.PatternsSOneEMC) else ef.PatternsSOneEMC(src)
-        )
-        detector = ef.detector(detector)
+        pattern = (src if isinstance(src, ef.PatternsSOneEMC) else
+                   ef.PatternsSOneEMC(src))
+        det = ef.detector(detector)
         datasets = {
-            "(default)": PatternDataModel(pattern, detector=detector, modify=False)
+            "(default)": PatternDataModel(pattern, detector=det, modify=False)
         }
     else:
         datasets = {
             k: v if isinstance(v, PatternDataModel) else PatternDataModel(**v)
             for k, v in src.items()
         }
+
     return PatternViewer(datasets)
