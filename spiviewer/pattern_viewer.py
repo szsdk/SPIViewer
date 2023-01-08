@@ -58,7 +58,7 @@ class PatternViewerShortcuts:
     def keyPressEvent(self, event, pv: "PatternViewer"):
         event.accept()
         key = event.key()
-        if key == QtCore.Qt.Key_Escape:
+        if key == QtCore.Qt.Key.Key_Escape:
             self._marking = False
             pv.imageViewer.setFocus()
         text = event.text()
@@ -122,9 +122,10 @@ class PatternViewerShortcuts:
         elif text == "d":
             ret = QMessageBox.question(
                 pv,
-                'MessageBox',
+                "MessageBox",
                 f"Are you sure you want to delete the dataset [{pv.currentDatasetName}]?",
-                QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
             )
             if ret == QMessageBox.Yes:
                 pv.removeDataset()
@@ -135,6 +136,7 @@ class PatternViewerShortcuts:
 
 
 nullPatternDataModel = NullPatternDataModel()
+
 
 class PatternViewer(QtWidgets.QMainWindow):
     rotationChanged = QtCore.pyqtSignal(int)
@@ -180,10 +182,12 @@ class PatternViewer(QtWidgets.QMainWindow):
         self.imageViewer = pg.ImageView()
         self.imageViewer.scene.sigMouseMoved.connect(self.mouseMovedEvent)
         self.infoLabel = InformationLabel(parent=self.imageViewer)
-        self.infoLabel.setAlignment(QtCore.Qt.AlignTop)
+        self.infoLabel.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         self.infoLabel.setStyleSheet("color:#888888;")
         self.infoLabel.move(10, 10)
-        self.infoLabel.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        self.infoLabel.setTextInteractionFlags(
+            QtCore.Qt.TextInteractionFlag.TextSelectableByMouse
+        )
         grid.addWidget(self.imageViewer, 1, 0, 1, 2)
 
         self.datasetGroup = QtWidgets.QGroupBox("Index")
