@@ -429,9 +429,10 @@ class PatternViewer(QtWidgets.QMainWindow):
 
 def patternViewer(src, detector=None):
     if detector is not None:
-        pattern = (
-            src if isinstance(src, ef.PatternsSOneEMC) else ef.PatternsSOneEMC(src)
-        )
+        if isinstance(src, (ef.PatternsSOneEMC, ef.PatternsSOne)):
+            pattern = src
+        else:
+            pattern = ef.PatternsSOneEMC(src)
         det = ef.detector(detector)
         datasets = {"(default)": PatternDataModel(pattern, detector=det, modify=False)}
     else:
