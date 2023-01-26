@@ -6,7 +6,7 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets
 from rich.logging import RichHandler
 
-from spiviewer.pattern_viewer import PatternDataModel, PatternViewer, patternViewer
+from spiviewer.pattern_viewer import PatternDataModel, patternViewer
 
 logging.basicConfig(
     level=logging.DEBUG, format="%(asctime)s %(message)s", handlers=[RichHandler()]

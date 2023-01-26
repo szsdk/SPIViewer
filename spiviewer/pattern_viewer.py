@@ -162,7 +162,7 @@ class PatternViewer(QtWidgets.QMainWindow):
         self.angularStatisticViewer = None
 
     @property
-    def currentDataset(self):
+    def currentDataset(self) -> PatternDataModel:
         return self.datasets.get(self.currentDatasetName, nullPatternDataModel)
 
     @property
@@ -270,9 +270,41 @@ class PatternViewer(QtWidgets.QMainWindow):
         fileMenu = self.menuBar.addMenu("&File")
         openAction = fileMenu.addAction("&Open")
         openAction.triggered.connect(lambda: print("NotImplemented"))
+        saveAction = fileMenu.addAction("&Save")
+        saveAction.triggered.connect(self._save)
+        saveAction.setShortcut("Ctrl+S")
         analysisMenu = self.menuBar.addMenu("&Analysis")
         angularStatisticAction = analysisMenu.addAction("Angular statistic")
         angularStatisticAction.triggered.connect(self._angularStatistic)
+
+    def _save_patterns_only_emc(self, fileName: Path):
+        ds = self.currentDataset
+        ds.patterns[ds.selectedList].write(fileName.with_suffix(".emc"))
+
+    def _save_patterns_only_h5(self, fileName: Path):
+        ds = self.currentDataset
+        ds.patterns[ds.selectedList].write(fileName.with_suffix(".h5"))
+
+    def _save_index_only_npy(self, fileName: Path):
+        np.save(fileName.with_suffix(".npy"), self.currentDataset.selectedList)
+
+    def _save_h5(self, fileName: Path):
+        fileName = fileName.with_suffix(".h5")
+        self._save_patterns_only_h5(fileName)
+        ef.write_array(f"{fileName}::index", self.currentDataset.selectedList)
+
+    def _save(self):
+        fileTypeFuncs = {
+            "(*.h5)": self._save_h5,
+            "Patterns only(*.h5)": self._save_patterns_only_h5,
+            "Patterns only(*.emc)": self._save_patterns_only_emc,
+            "Index only(*.npy)": self._save_index_only_npy,
+        }
+        fileName, fileType = QtWidgets.QFileDialog.getSaveFileName(
+            self, "Save File", "", ";;".join(fileTypeFuncs.keys())
+        )
+        if fileName:
+            fileTypeFuncs[fileType](Path(fileName))
 
     def _angularStatistic(self):
         if self.angularStatisticViewer is None:
