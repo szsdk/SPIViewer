@@ -301,7 +301,7 @@ class PatternViewer(QtWidgets.QMainWindow):
             "Index only(*.npy)": self._save_index_only_npy,
         }
         fileName, fileType = QtWidgets.QFileDialog.getSaveFileName(
-            self, "Save File", "", ";;".join(fileTypeFuncs.keys())
+            self, "Save File", f"{self.currentDatasetName}.h5", ";;".join(fileTypeFuncs.keys())
         )
         if fileName:
             fileTypeFuncs[fileType](Path(fileName))
