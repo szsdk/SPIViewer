@@ -145,10 +145,11 @@ class PatternDataModel(QtCore.QObject):
     def __len__(self):
         return len(self.selectedList)
 
+
 class NullPatternDataModel(QtCore.QObject):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
-        self.patterns = np.full((1,1), np.nan)
+        self.patterns = np.full((1, 1), np.nan)
         self.rawIndex = 0
         self.index = 0
         self.symmetrize = False
@@ -156,7 +157,9 @@ class NullPatternDataModel(QtCore.QObject):
 
     def getSelection(self):
         return None
+
     def __len__(self):
         return 0
+
     def select(self, index):
         pass

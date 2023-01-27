@@ -282,16 +282,19 @@ class PatternViewer(QtWidgets.QMainWindow):
         ds.patterns[ds.selectedList].write(fileName.with_suffix(".emc"))
 
     def _save_patterns_only_h5(self, fileName: Path):
+        if isinstance(fileName, Path):
+            fileName = fileName.with_suffix(".h5")
         ds = self.currentDataset
-        ds.patterns[ds.selectedList].write(fileName.with_suffix(".h5"))
+        ds.patterns[ds.selectedList].write(fileName)
 
     def _save_index_only_npy(self, fileName: Path):
         np.save(fileName.with_suffix(".npy"), self.currentDataset.selectedList)
 
     def _save_h5(self, fileName: Path):
-        fileName = fileName.with_suffix(".h5")
+        if isinstance(fileName, Path):
+            fileName = ef.make_path(fileName.with_suffix(".h5"))
         self._save_patterns_only_h5(fileName)
-        ef.write_array(f"{fileName}::index", self.currentDataset.selectedList)
+        ef.write_array(fileName / "index", self.currentDataset.selectedList)
 
     def _save(self):
         fileTypeFuncs = {
@@ -304,7 +307,7 @@ class PatternViewer(QtWidgets.QMainWindow):
             self, "Save File", f"{self.currentDatasetName}.h5", ";;".join(fileTypeFuncs.keys())
         )
         if fileName:
-            fileTypeFuncs[fileType](Path(fileName))
+            fileTypeFuncs[fileType](ef.make_path(fileName))
 
     def _angularStatistic(self):
         if self.angularStatisticViewer is None:
