@@ -46,7 +46,9 @@ class PatternDataModel(QtCore.QObject):
         self.selectedList = (
             np.arange(self.patterns.shape[0]) if selectedList is None else selectedList
         )
-        self._rawIndex = int(self.selectedList[self.index])
+        self._rawIndex = (
+            None if self.index is None else int(self.selectedList[self.index])
+        )
         self._applyMask = applyMask
         self._protectIndex = False
         self.setSymmetrize(symmetrize)
@@ -105,7 +107,8 @@ class PatternDataModel(QtCore.QObject):
         if self._protectIndex:
             return
         self._index = index
-        self.selectByRawIndex(int(self.selectedList[self.index]))
+        if self.index is not None:
+            self.selectByRawIndex(int(self.selectedList[self.index]))
 
     def selectByRawIndex(self, rawIndex):
         self._rawIndex = rawIndex
@@ -145,10 +148,11 @@ class PatternDataModel(QtCore.QObject):
     def __len__(self):
         return len(self.selectedList)
 
+
 class NullPatternDataModel(QtCore.QObject):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
-        self.patterns = np.full((1,1), np.nan)
+        self.patterns = np.full((1, 1), np.nan)
         self.rawIndex = 0
         self.index = 0
         self.symmetrize = False
@@ -156,7 +160,9 @@ class NullPatternDataModel(QtCore.QObject):
 
     def getSelection(self):
         return None
+
     def __len__(self):
         return 0
+
     def select(self, index):
         pass
