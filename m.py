@@ -49,6 +49,9 @@ w = patternViewer(
 )
 # w = patternViewer("/u/szsdk/NeoEMC/data/photons.emc", "/u/szsdk/NeoEMC/data/det_sim.dat")
 
+w.currentImageChangedFunc = lambda x: x.infoLabel.update(
+    {"doubled index": 2 * x.currentDataset.rawIndex}
+)
 w.show()
 
 # btn = QtWidgets.QPushButton("ff")

@@ -1,6 +1,6 @@
-from typing import Optional
 import logging
 from pathlib import Path
+from typing import Optional
 
 import emcfile as ef
 import matplotlib.pyplot as plt
@@ -11,7 +11,7 @@ from pyqtgraph.Qt.QtWidgets import QMessageBox
 
 from . import utils
 from ._angular_statistic_viewer import AngularStatisticViewer
-from ._pattern_data_model import PatternDataModel, NullPatternDataModel
+from ._pattern_data_model import NullPatternDataModel, PatternDataModel
 
 __all__ = [
     "PatternDataModel",
@@ -160,6 +160,14 @@ class PatternViewer(QtWidgets.QMainWindow):
         self.shortcuts = PatternViewerShortcuts()
 
         self.angularStatisticViewer = None
+        self.currentImageChangedFunc = None
+        # This is a shortcut function which would be called whenever the image is changed.
+        # It could be modified directly. Setting it to `None` avoids the calling.
+        self.currentImageChanged.connect(self._callCurrentImageChangedFunc)
+
+    def _callCurrentImageChangedFunc(self):
+        if self.currentImageChangedFunc is not None:
+            self.currentImageChangedFunc(self)
 
     @property
     def currentDataset(self) -> PatternDataModel:
@@ -304,7 +312,10 @@ class PatternViewer(QtWidgets.QMainWindow):
             "Index only(*.npy)": self._save_index_only_npy,
         }
         fileName, fileType = QtWidgets.QFileDialog.getSaveFileName(
-            self, "Save File", f"{self.currentDatasetName}.h5", ";;".join(fileTypeFuncs.keys())
+            self,
+            "Save File",
+            f"{self.currentDatasetName}.h5",
+            ";;".join(fileTypeFuncs.keys()),
         )
         if fileName:
             fileTypeFuncs[fileType](ef.make_path(fileName))
