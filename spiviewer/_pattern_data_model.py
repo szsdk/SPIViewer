@@ -44,7 +44,9 @@ class PatternDataModel(QtCore.QObject):
         self._index = initIndex
         self.modify = modify
         self.selectedList = (
-            np.arange(self.patterns.shape[0]) if selectedList is None else selectedList
+            np.arange(self.patterns.shape[0])
+            if selectedList is None
+            else np.array(selectedList, int)
         )
         self._rawIndex = (
             None if self.index is None else int(self.selectedList[self.index])
