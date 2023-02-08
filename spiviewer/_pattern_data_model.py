@@ -1,3 +1,4 @@
+from copy import deepcopy
 import operator
 
 import cachetools
@@ -8,16 +9,10 @@ from pyqtgraph.Qt import QtCore
 
 def _symmetrizedDetr(det, symmetrize):
     if not symmetrize:
-        new_det = det
-    else:
-        dd = det.to_dict()
-        dd["coor"] = np.concatenate(
-            [dd["coor"], dd["coor"] * np.array([-1, -1, 1])], axis=0
-        )
-        dd["factor"] = np.concatenate([dd["factor"]] * 2)
-        dd["mask"] = np.concatenate([dd["mask"]] * 2)
-        new_det = ef.detector(**dd)
-    return ef.det_render(new_det)
+        return ef.det_render(det)
+    det_sym = deepcopy(det)
+    det_sym.coor *= np.array([-1, -1, 1])
+    return ef.det_render(np.concatenate([det, det_sym]))
 
 
 class PatternDataModel(QtCore.QObject):
