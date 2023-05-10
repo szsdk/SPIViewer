@@ -452,7 +452,7 @@ class PatternViewer(QtWidgets.QMainWindow):
             self.imageViewer.clear()
             return
         sx, sy = img.shape
-        x0, x1, y0, y1 = self.currentDataset.detectorRender.frame_extent()
+        y0, y1, x0, x1 = self.currentDataset.detectorRender.frame_extent()
         tr = QtGui.QTransform()
         tr.rotate(self.rotation)
         tr.scale((x1 - x0) / sx, (y1 - y0) / sy)
