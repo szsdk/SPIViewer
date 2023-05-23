@@ -104,7 +104,7 @@ class PatternDataModel(QtCore.QObject):
         if self._protectIndex:
             return
         self._index = None if index == -1 else index
-        if self.index is not None:
+        if self.index is not None and self.index < len(self.selectedList):
             self.selectByRawIndex(int(self.selectedList[self.index]))
 
     def selectByRawIndex(self, rawIndex):
@@ -114,13 +114,16 @@ class PatternDataModel(QtCore.QObject):
         self._protectIndex = False
 
     def selectNext(self, d: int = 1):
-        self.select((self.index + d) % len(self))
+        if self.index is not None:
+            self.select((self.index + d) % len(self))
 
     def selectPrevious(self, d: int = 1):
-        self.select((self.index - d) % len(self))
+        if self.index is not None:
+            self.select((self.index - d) % len(self))
 
     def selectRandomly(self):
-        self.select(np.random.choice(len(self)))
+        if self.index is not None:
+            self.select(np.random.choice(len(self)))
 
     def getSelection(self):
         return self.getImage(self.rawIndex)
