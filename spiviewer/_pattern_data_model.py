@@ -103,7 +103,7 @@ class PatternDataModel(QtCore.QObject):
     def select(self, index: int):
         if self._protectIndex:
             return
-        self._index = index
+        self._index = None if index == -1 else index
         if self.index is not None:
             self.selectByRawIndex(int(self.selectedList[self.index]))
 

@@ -44,7 +44,7 @@ pd = PatternDataModel(patterns, detector=det, modify=False)
 w = patternViewer(
     {
         "(default)": pd,
-        "a": PatternDataModel(patterns, detector=det, selectedList=np.arange(11)),
+        "empty": PatternDataModel(patterns, detector=det, initIndex=None, selectedList=np.arange(0)),
     }
 )
 # w = patternViewer("/u/szsdk/NeoEMC/data/photons.emc", "/u/szsdk/NeoEMC/data/det_sim.dat")

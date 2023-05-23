@@ -124,10 +124,10 @@ class PatternViewerShortcuts:
                 pv,
                 "MessageBox",
                 f"Are you sure you want to delete the dataset [{pv.currentDatasetName}]?",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
             )
-            if ret == QMessageBox.Yes:
+            if ret == QMessageBox.StandardButton.Yes:
                 pv.removeDataset()
         elif text in self._custom:
             self._custom[text]()
