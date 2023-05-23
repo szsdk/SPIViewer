@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
-from pyqtgraph.Qt.QtWidgets import QMessageBox
+from pyqtgraph.Qt.QtWidgets import QMessageBox, QInputDialog
 
 from . import utils
 from ._angular_statistic_viewer import AngularStatisticViewer
@@ -129,6 +129,10 @@ class PatternViewerShortcuts:
             )
             if ret == QMessageBox.StandardButton.Yes:
                 pv.removeDataset()
+        elif text == "A":
+            newDatasetName, ok = QInputDialog.getText(pv, 'Text Input Dialog', 'Enter your name:')
+            if ok:
+                pv.addDataset(newDatasetName)
         elif text in self._custom:
             self._custom[text]()
         else:
@@ -379,6 +383,15 @@ class PatternViewer(QtWidgets.QMainWindow):
             self._setCurrentDataset("")
         elif name == self.currentDatasetName:
             self._setCurrentDataset(next(self.datasets.keys()))
+
+    def addDataset(self, name):
+        if name in self.datasets:
+            raise Exception("exists")
+        self.currentDatasetBox.addItem(name)
+        self.dataset2Box.addItem(name)
+        self.datasets[name]= PatternDataModel(self.currentDataset.patterns,
+                                              detector=self.currentDataset.detector, initIndex=None, selectedList=[])
+
 
     def switchDatasets(self):
         t = self._dataset2Name
