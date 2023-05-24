@@ -129,9 +129,16 @@ class PatternViewerShortcuts:
         if text == "m":
             self._marking = True
         elif text == "e":
-            pv.currentDataset.setSelectedList(
-                edit_with_vim(pv.currentDataset.selectedList)
-            )
+            if pv.currentDataset.modify:
+                pv.currentDataset.setSelectedList(
+                    edit_with_vim(pv.currentDataset.selectedList)
+                )
+            else:
+                QMessageBox.warning(pv,
+                                    "Cannot modify",
+                                    f"The dataset {pv.currentDatasetName} cannot be modified.",
+                                    QMessageBox.StandardButton.Ok,
+                                    )
         elif text == "g":
             pv.patternIndexSpinBox.selectAll()
             pv.patternIndexSpinBox.setFocus()
