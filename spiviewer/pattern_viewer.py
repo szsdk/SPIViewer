@@ -1,6 +1,9 @@
+import os
+import subprocess
 import logging
 from pathlib import Path
 from typing import Optional
+import tempfile
 
 import emcfile as ef
 import matplotlib.pyplot as plt
@@ -39,6 +42,7 @@ __doc__ = """
 - `x`: delete a pattern from D0
 - `A`: add a new dataset
 - `D`: delete D0
+- `e`: edit the pattern indices of D0 with `EDITOR`, `VISUAL` or `vim
 - `esc`: reset focus
 - `esc`×2: exit
 """
@@ -61,6 +65,20 @@ class InformationLabel(QtWidgets.QLabel):
             text.append(f"{k}: {v}")
         self.setText("\n".join(text))
         self.adjustSize()
+
+
+def edit_with_vim(a, suffix=""):
+    if "EDITOR" in os.environ:
+        editor = os.environ["EDITOR"]
+    elif "VISUAL" in os.environ:
+        editor = os.environ["VISUAL"]
+    else:
+        editor = "vim"
+
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=True) as temp_file:
+        np.savetxt(temp_file.name, a, fmt='%d')
+        subprocess.call(f"{editor} {temp_file.name}", shell=True)
+        return np.loadtxt(temp_file.name, dtype=int)
 
 
 class PatternViewerShortcuts:
@@ -110,6 +128,10 @@ class PatternViewerShortcuts:
 
         if text == "m":
             self._marking = True
+        elif text == "e":
+            pv.currentDataset.setSelectedList(
+                edit_with_vim(pv.currentDataset.selectedList)
+            )
         elif text == "g":
             pv.patternIndexSpinBox.selectAll()
             pv.patternIndexSpinBox.setFocus()
