@@ -20,6 +20,29 @@ __all__ = [
 
 _logger = logging.getLogger(__file__)
 
+__doc__ = """
+# SPI Viewer
+- D0: the main dataset
+- D1: the sencondary dataset
+
+## Shortcuts
+- `g`: go to a pattern by typing its index
+- `h`, `j`: scroll datasets
+- `k`, `l`: scroll patterns
+- `-`, `=`: rotate
+- `m1`, ..., `m9`: make a bookmark
+- `1`, ..., `9`: go to a bookmark
+- `0`: a special bookmark for the last shown pattern
+- `S`: switch datasets
+- `s`: switch a pattern from D0 to D1
+- `a`: add a pattern from D0 to D1
+- `x`: delete a pattern from D0
+- `A`: add a new dataset
+- `D`: delete D0
+- `esc`: reset focus
+- `esc`×2: exit
+"""
+
 
 class InformationLabel(QtWidgets.QLabel):
     def __init__(self, parent=None):
@@ -43,10 +66,11 @@ class InformationLabel(QtWidgets.QLabel):
 class PatternViewerShortcuts:
     def __init__(self):
         self._gears = {
-            "nextPattern": utils.Gear([100, 10, 1], [0.1, 0.5]),
-            "previousPattern": utils.Gear([100, 10, 1], [0.1, 0.5]),
+            "nextPattern": utils.Gear([100, 10, 1], [0.1, 0.2]),
+            "previousPattern": utils.Gear([100, 10, 1], [0.1, 0.2]),
             "left": utils.Gear([5, 1], [0.2]),
             "right": utils.Gear([5, 1], [0.2]),
+            "close": utils.Gear([True, False], [0.2])
         }
         self.bookmarks = dict()
         self._marking = False
@@ -60,7 +84,10 @@ class PatternViewerShortcuts:
         key = event.key()
         if key == QtCore.Qt.Key.Key_Escape:
             self._marking = False
-            pv.imageViewer.setFocus()
+            if self._gears["close"].getSpeed():
+                QtWidgets.QApplication.quit()
+            else:
+                pv.imageViewer.setFocus()
         text = event.text()
         if self._marking:
             self._marking = False
@@ -119,7 +146,7 @@ class PatternViewerShortcuts:
             idx = pv.currentDataset.rawIndex
             pv.currentDataset.removePattern(pv.currentDataset.rawIndex)
             pv.dataset2.addPattern(idx)
-        elif text == "d":
+        elif text == "D":
             ret = QMessageBox.question(
                 pv,
                 "MessageBox",
@@ -128,9 +155,11 @@ class PatternViewerShortcuts:
                 QMessageBox.StandardButton.No,
             )
             if ret == QMessageBox.StandardButton.Yes:
-                pv.removeDataset()
+                pv.deleteDataset()
         elif text == "A":
-            newDatasetName, ok = QInputDialog.getText(pv, 'Text Input Dialog', 'Enter your name:')
+            newDatasetName, ok = QInputDialog.getText(
+                pv, "Text Input Dialog", "Enter your name:"
+            )
             if ok:
                 pv.addDataset(newDatasetName)
         elif text in self._custom:
@@ -140,6 +169,23 @@ class PatternViewerShortcuts:
 
 
 nullPatternDataModel = NullPatternDataModel()
+
+
+class HelpWindow(QtWidgets.QMainWindow):
+    def __init__(self, help_text, parent=None):
+        super().__init__(parent=parent)
+
+        self.setWindowTitle("Help")
+        self.setGeometry(100, 100, 400, 300)
+
+        self.text_edit = QtWidgets.QTextEdit()
+        self.text_edit.setReadOnly(True)
+        self.setCentralWidget(self.text_edit)
+
+        self.display_help(help_text)
+
+    def display_help(self, help_text):
+        self.text_edit.setMarkdown(help_text)
 
 
 class PatternViewer(QtWidgets.QMainWindow):
@@ -288,6 +334,14 @@ class PatternViewer(QtWidgets.QMainWindow):
         analysisMenu = self.menuBar.addMenu("&Analysis")
         angularStatisticAction = analysisMenu.addAction("Angular statistic")
         angularStatisticAction.triggered.connect(self._angularStatistic)
+        helpMenu = self.menuBar.addMenu("&Help")
+        getHelpAction = helpMenu.addAction("Get &Help")
+        getHelpAction.triggered.connect(self._getHelp)
+
+    def _getHelp(self):
+        help_window = HelpWindow(__doc__, parent=self)
+        help_window.show()
+        # help_window.exec()
 
     def _save_patterns_only_emc(self, fileName: Path):
         ds = self.currentDataset
@@ -368,7 +422,7 @@ class PatternViewer(QtWidgets.QMainWindow):
         if needUpdate:
             self._setCurrentDataset(name)
 
-    def removeDataset(self, name=None):
+    def deleteDataset(self, name=None):
         if name is None:
             name = self.currentDatasetName
         if name not in self.datasets:
@@ -389,9 +443,12 @@ class PatternViewer(QtWidgets.QMainWindow):
             raise Exception("exists")
         self.currentDatasetBox.addItem(name)
         self.dataset2Box.addItem(name)
-        self.datasets[name]= PatternDataModel(self.currentDataset.patterns,
-                                              detector=self.currentDataset.detector, initIndex=None, selectedList=[])
-
+        self.datasets[name] = PatternDataModel(
+            self.currentDataset.patterns,
+            detector=self.currentDataset.detector,
+            initIndex=None,
+            selectedList=[],
+        )
 
     def switchDatasets(self):
         t = self._dataset2Name
@@ -450,6 +507,15 @@ class PatternViewer(QtWidgets.QMainWindow):
         self.rotationChanged.emit(r)
         self._protectRotation = False
 
+    def _getSetImageArgs(self):
+        if self._imageInitialized:
+            return dict()
+        return dict(
+            autoRange=False,
+            autoHistogramRange=False,
+            autoLevels=False,
+        )
+
     def setImage(self, img: Optional[np.ndarray]):
         s = self.currentDataset.patterns[self.currentDataset.rawIndex].sum()
         self.infoLabel.update(
@@ -472,17 +538,8 @@ class PatternViewer(QtWidgets.QMainWindow):
         tr.translate(x0 - 0.5, y0 - 0.5)
         self._transform = tr
         self._transformInverted = tr.inverted()[0]
-        if self._imageInitialized:
-            self.imageViewer.setImage(img, transform=tr)
-            self._imageInitialized = False
-        else:
-            self.imageViewer.setImage(
-                img,
-                transform=tr,
-                autoRange=False,
-                autoHistogramRange=False,
-                autoLevels=False,
-            )
+        self.imageViewer.setImage(img, transform=tr, **self._getSetImageArgs())
+        self._imageInitialized = False
         self.currentImageChanged.emit(self)
 
 
