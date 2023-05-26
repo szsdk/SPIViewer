@@ -45,6 +45,7 @@ __doc__ = """
 - `e`: edit the pattern indices of D0 with `EDITOR`, `VISUAL` or `vim
 - `esc`: reset focus
 - `esc`×2: exit
+- `?`: show help
 """
 
 
@@ -184,6 +185,8 @@ class PatternViewerShortcuts:
             )
             if ok:
                 pv.addDataset(newDatasetName)
+        elif text == "?":
+            pv.showHelp()
         elif text in self._custom:
             self._custom[text]()
         else:
@@ -358,12 +361,11 @@ class PatternViewer(QtWidgets.QMainWindow):
         angularStatisticAction.triggered.connect(self._angularStatistic)
         helpMenu = self.menuBar.addMenu("&Help")
         getHelpAction = helpMenu.addAction("Get &Help")
-        getHelpAction.triggered.connect(self._getHelp)
+        getHelpAction.triggered.connect(self.showHelp)
 
-    def _getHelp(self):
+    def showHelp(self):
         help_window = HelpWindow(__doc__, parent=self)
         help_window.show()
-        # help_window.exec()
 
     def _save_patterns_only_emc(self, fileName: Path):
         ds = self.currentDataset
