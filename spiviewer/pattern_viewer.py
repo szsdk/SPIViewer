@@ -207,6 +207,7 @@ class HelpWindow(QtWidgets.QMainWindow):
     def __init__(self, help_text, parent=None):
         super().__init__(parent=parent)
 
+        self.setWindowFlag(QtCore.Qt.WindowType.Tool)
         self.setWindowTitle("Help")
         self.setGeometry(100, 100, 400, 300)
 
@@ -306,7 +307,9 @@ class PatternViewer(QtWidgets.QMainWindow):
         hbox.addWidget(self.dataset2Box)
         grid.addWidget(self.datasetGroup, 2, 0, 1, 1)
 
-        self.imageGroup = QtWidgets.QGroupBox("Image")
+        # self.imageGroup = QtWidgets.QGroupBox("Image")
+        self.imageGroup = QtWidgets.QWidget()
+        self.imageGroup.setWindowFlag(QtCore.Qt.WindowType.Tool)
         igLayout = QtWidgets.QGridLayout()
         self.rotationSlider = QtWidgets.QSlider(
             QtCore.Qt.Orientation.Horizontal, parent=self
@@ -323,13 +326,16 @@ class PatternViewer(QtWidgets.QMainWindow):
         igLayout.addWidget(QtWidgets.QLabel("rotation"), 0, 0)
         igLayout.addWidget(self.rotationSlider, 0, 1, 1, 3)
 
+        self.flipCheckBox = QtWidgets.QCheckBox("flip")
+        self.flipCheckBox.stateChanged.connect(lambda state: self.setImage(self._currentImage))
         self.symmetrizeCheckBox = QtWidgets.QCheckBox("symmetrize")
         self.symmetrizeCheckBox.stateChanged.connect(
             lambda a: self.currentDataset.setSymmetrize(
                 self.symmetrizeCheckBox.isChecked()
             )
         )
-        igLayout.addWidget(self.symmetrizeCheckBox, 1, 2)
+        igLayout.addWidget(self.flipCheckBox, 3, 2)
+        igLayout.addWidget(self.symmetrizeCheckBox, 3, 1)
 
         self.applyMaskCheckBox = QtWidgets.QCheckBox("apply mask")
         self.applyMaskCheckBox.stateChanged.connect(
@@ -337,7 +343,7 @@ class PatternViewer(QtWidgets.QMainWindow):
                 self.applyMaskCheckBox.isChecked()
             )
         )
-        igLayout.addWidget(self.applyMaskCheckBox, 1, 3)
+        igLayout.addWidget(self.applyMaskCheckBox, 3, 3)
 
         self.colormapBox = QtWidgets.QComboBox(parent=self)
         self.colormapBox.addItems(plt.colormaps())
@@ -349,8 +355,15 @@ class PatternViewer(QtWidgets.QMainWindow):
         igLayout.addWidget(QtWidgets.QLabel("colormap"), 1, 0)
         igLayout.addWidget(self.colormapBox, 1, 1)
 
+        self.applyImageFuncBox = QtWidgets.QLineEdit(parent=self.imageGroup)
+        self.applyImageFuncBox.setPlaceholderText("np.log(x)")
+        self.applyImageFuncBox.returnPressed.connect(lambda: self.setImage(self._currentImage))
+        igLayout.addWidget(QtWidgets.QLabel("apply"), 2, 0)
+        igLayout.addWidget(self.applyImageFuncBox, 2, 1, 1, 3)
+
         self.imageGroup.setLayout(igLayout)
-        grid.addWidget(self.imageGroup, 3, 0)
+        # self.imageGroup.show()
+        # grid.addWidget(self.imageGroup, 3, 0)
 
         self.setCentralWidget(QtWidgets.QWidget(parent=self))
         self.centralWidget().setLayout(grid)
@@ -366,8 +379,10 @@ class PatternViewer(QtWidgets.QMainWindow):
         analysisMenu = self.menuBar.addMenu("&Analysis")
         angularStatisticAction = analysisMenu.addAction("Angular statistic")
         angularStatisticAction.triggered.connect(self._angularStatistic)
-        helpMenu = self.menuBar.addMenu("&Help")
-        getHelpAction = helpMenu.addAction("Get &Help")
+        viewMenu = self.menuBar.addMenu("&View")
+        imageMenu = viewMenu.addAction("&Image")
+        imageMenu.triggered.connect(self.imageGroup.show)
+        getHelpAction = viewMenu.addAction("&Help")
         getHelpAction.triggered.connect(self.showHelp)
 
     def showHelp(self):
@@ -565,10 +580,19 @@ class PatternViewer(QtWidgets.QMainWindow):
         y0, y1, x0, x1 = self.currentDataset.detectorRender.frame_extent()
         tr = QtGui.QTransform()
         tr.rotate(self.rotation)
-        tr.scale((x1 - x0) / sx, (y1 - y0) / sy)
+        if self.flipCheckBox.isChecked():
+            tr.scale((x0 - x1) / sx, (y1 - y0) / sy)
+        else:
+            tr.scale((x1 - x0) / sx, (y1 - y0) / sy)
         tr.translate(x0 - 0.5, y0 - 0.5)
         self._transform = tr
         self._transformInverted = tr.inverted()[0]
+        f = self.applyImageFuncBox.text()
+        if f == "":
+            img = img
+        else:
+            with np.errstate(all='ignore'):
+                img = eval(f"lambda x: {f}")(img)
         self.imageViewer.setImage(img, transform=tr, **self._getSetImageArgs())
         self._imageInitialized = False
         self.currentImageChanged.emit(self)
