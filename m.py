@@ -6,7 +6,7 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets
 from rich.logging import RichHandler
 
-from spiviewer.pattern_viewer import PatternDataModel, patternViewer
+from spiviewer import PatternDataModel, patternViewer, ImageDataModel
 
 logging.basicConfig(
     level=logging.DEBUG, format="%(asctime)s %(message)s", handlers=[RichHandler()]
@@ -44,6 +44,7 @@ pd = PatternDataModel(patterns, detector=det, modify=False)
 w = patternViewer(
     {
         "(default)": pd,
+        "images": ImageDataModel(np.random.rand(10, 5, 10), None),
         "empty": PatternDataModel(patterns, detector=det, initIndex=None, selectedList=np.arange(0)),
     }
 )
@@ -53,16 +54,5 @@ w.currentImageChangedFunc = lambda x: x.infoLabel.update(
     {"doubled index": 2 * x.currentDataset.rawIndex}
 )
 w.show()
-
-# btn = QtWidgets.QPushButton("ff")
-# btn.clicked.connect(
-#     # lambda: w.removeDataset("a")
-#     lambda: w.setDataset("b", PatternDataModel(
-#             patterns,
-#             detector=det,
-#             selectedList=np.arange(11, 30)
-#         ))
-# )
-# btn.show()
 
 pg.exec()
