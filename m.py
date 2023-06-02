@@ -7,10 +7,12 @@ from pyqtgraph.Qt import QtWidgets
 from rich.logging import RichHandler
 
 from spiviewer import PatternDataModel, patternViewer, ImageDataModel
+from spiviewer import pg_helper
 
 logging.basicConfig(
     level=logging.DEBUG, format="%(asctime)s %(message)s", handlers=[RichHandler()]
 )
+
 
 
 def fake_detector(s, detd, beamstop):
@@ -45,7 +47,9 @@ w = patternViewer(
     {
         "(default)": pd,
         "images": ImageDataModel(np.random.rand(10, 5, 10), None),
-        "empty": PatternDataModel(patterns, detector=det, initIndex=None, selectedList=np.arange(0)),
+        "empty": PatternDataModel(
+            patterns, detector=det, initIndex=None, selectedList=np.arange(0)
+        ),
     }
 )
 # w = patternViewer("/u/szsdk/NeoEMC/data/photons.emc", "/u/szsdk/NeoEMC/data/det_sim.dat")
@@ -53,6 +57,9 @@ w = patternViewer(
 w.currentImageChangedFunc = lambda x: x.infoLabel.update(
     {"doubled index": 2 * x.currentDataset.rawIndex}
 )
+
+
+w.imageViewer.scene.exportDialog = pg_helper.ROIExporterDialog(w.imageViewer.scene)
 w.show()
 
 pg.exec()
