@@ -66,7 +66,8 @@ class ROIExporter(Exporter):
                 overwrite=True,
             )
             print(self.item.__dict__)
-        raise NotImplementedError(str(type(self.item)))
+        else:
+            raise NotImplementedError(str(type(self.item)))
 
 
 ROIExporter.register()
