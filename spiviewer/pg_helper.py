@@ -31,7 +31,14 @@ class ROIExporter(Exporter):
         self.params = Parameter(
             name="params",
             type="group",
-            children=[{"name": "Name", "title": translate("Exporter", "Name"), "type": "str", "value": "ROI"}],
+            children=[
+                {
+                    "name": "Name",
+                    "title": translate("Exporter", "Name"),
+                    "type": "str",
+                    "value": "ROI",
+                }
+            ],
         )
 
     def parameters(self):
@@ -66,6 +73,28 @@ class ROIExporter(Exporter):
                 overwrite=True,
             )
             print(self.item.__dict__)
+        elif isinstance(self.item, pg.RectROI):
+            state = self.item.getState()
+            ef.write_obj_h5(
+                f"{fileName}::{self.params['Name']}",
+                {
+                    "pos": np.array(state["pos"]),
+                    "size": np.array(state["size"]),
+                    "centered": state["centered"],
+                },
+                overwrite=True,
+            )
+        elif isinstance(self.item, pg.EllipseROI):
+            state = self.item.getState()
+            ef.write_obj_h5(
+                f"{fileName}::{self.params['Name']}",
+                {
+                    "pos": np.array(state["pos"]),
+                    "size": np.array(state["size"]),
+                    "angle": state["angle"],
+                },
+                overwrite=True,
+            )
         else:
             raise NotImplementedError(str(type(self.item)))
 

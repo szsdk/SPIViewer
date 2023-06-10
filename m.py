@@ -53,6 +53,8 @@ w = patternViewer(
     }
 )
 # w = patternViewer("/u/szsdk/NeoEMC/data/photons.emc", "/u/szsdk/NeoEMC/data/det_sim.dat")
+p = pg.EllipseROI([0, 0], [10, 10], pen="r")
+w.imageViewer.view.addItem(p)
 
 w.currentImageChangedFunc = lambda x: x.infoLabel.update(
     {"doubled index": 2 * x.currentDataset.rawIndex}
