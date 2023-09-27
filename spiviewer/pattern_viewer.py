@@ -1,24 +1,51 @@
+import os
+import subprocess
 import logging
 from pathlib import Path
 from typing import Optional
+import tempfile
 
 import emcfile as ef
 import matplotlib.pyplot as plt
 import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
-from pyqtgraph.Qt.QtWidgets import QMessageBox
+from pyqtgraph.Qt.QtWidgets import QMessageBox, QInputDialog
 
 from . import utils
 from ._angular_statistic_viewer import AngularStatisticViewer
-from ._pattern_data_model import NullPatternDataModel, PatternDataModel
+from ._pattern_data_model import NullPatternDataModel, PatternDataModelBase, PatternDataModel
 
 __all__ = [
-    "PatternDataModel",
     "PatternViewer",
 ]
 
 _logger = logging.getLogger(__file__)
+
+__doc__ = """
+# SPI Viewer
+- D0: the main dataset
+- D1: the sencondary dataset
+
+## Shortcuts
+- `g`: go to a pattern by typing its index
+- `h`, `j`: scroll datasets
+- `k`, `l`: scroll patterns
+- `-`, `=`: rotate
+- `m1`, ..., `m9`: make a bookmark
+- `1`, ..., `9`: go to a bookmark
+- `0`: a special bookmark for the last shown pattern
+- `S`: switch datasets
+- `s`: switch a pattern from D0 to D1
+- `a`: add a pattern from D0 to D1
+- `x`: delete a pattern from D0
+- `A`: add a new dataset
+- `D`: delete D0
+- `e`: edit the pattern indices of D0 with `EDITOR`, `VISUAL` or `vim
+- `esc`: reset focus
+- `esc`×2: exit
+- `?`: show help
+"""
 
 
 class InformationLabel(QtWidgets.QLabel):
@@ -40,13 +67,28 @@ class InformationLabel(QtWidgets.QLabel):
         self.adjustSize()
 
 
+def edit_with_vim(a, suffix=""):
+    if "EDITOR" in os.environ:
+        editor = os.environ["EDITOR"]
+    elif "VISUAL" in os.environ:
+        editor = os.environ["VISUAL"]
+    else:
+        editor = "vim"
+
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=True) as temp_file:
+        np.savetxt(temp_file.name, a, fmt="%d")
+        subprocess.call(f"{editor} {temp_file.name}", shell=True)
+        return np.loadtxt(temp_file.name, dtype=int)
+
+
 class PatternViewerShortcuts:
     def __init__(self):
         self._gears = {
-            "nextPattern": utils.Gear([100, 10, 1], [0.1, 0.5]),
-            "previousPattern": utils.Gear([100, 10, 1], [0.1, 0.5]),
+            "nextPattern": utils.Gear([100, 10, 1], [0.1, 0.2]),
+            "previousPattern": utils.Gear([100, 10, 1], [0.1, 0.2]),
             "left": utils.Gear([5, 1], [0.2]),
             "right": utils.Gear([5, 1], [0.2]),
+            "close": utils.Gear([True, False], [0.2]),
         }
         self.bookmarks = dict()
         self._marking = False
@@ -60,7 +102,10 @@ class PatternViewerShortcuts:
         key = event.key()
         if key == QtCore.Qt.Key.Key_Escape:
             self._marking = False
-            pv.imageViewer.setFocus()
+            if self._gears["close"].getSpeed():
+                QtWidgets.QApplication.quit()
+            else:
+                pv.imageViewer.setFocus()
         text = event.text()
         if self._marking:
             self._marking = False
@@ -83,6 +128,18 @@ class PatternViewerShortcuts:
 
         if text == "m":
             self._marking = True
+        elif text == "e":
+            if pv.currentDataset.modify:
+                pv.currentDataset.setSelectedList(
+                    edit_with_vim(pv.currentDataset.selectedList)
+                )
+            else:
+                QMessageBox.warning(
+                    pv,
+                    "Cannot modify",
+                    f"The dataset {pv.currentDatasetName} cannot be modified.",
+                    QMessageBox.StandardButton.Ok,
+                )
         elif text == "g":
             pv.patternIndexSpinBox.selectAll()
             pv.patternIndexSpinBox.setFocus()
@@ -119,16 +176,24 @@ class PatternViewerShortcuts:
             idx = pv.currentDataset.rawIndex
             pv.currentDataset.removePattern(pv.currentDataset.rawIndex)
             pv.dataset2.addPattern(idx)
-        elif text == "d":
+        elif text == "D":
             ret = QMessageBox.question(
                 pv,
                 "MessageBox",
                 f"Are you sure you want to delete the dataset [{pv.currentDatasetName}]?",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
             )
-            if ret == QMessageBox.Yes:
-                pv.removeDataset()
+            if ret == QMessageBox.StandardButton.Yes:
+                pv.deleteDataset()
+        elif text == "A":
+            newDatasetName, ok = QInputDialog.getText(
+                pv, "Text Input Dialog", "Enter your name:"
+            )
+            if ok:
+                pv.addDataset(newDatasetName)
+        elif text == "?":
+            pv.showHelp()
         elif text in self._custom:
             self._custom[text]()
         else:
@@ -136,6 +201,24 @@ class PatternViewerShortcuts:
 
 
 nullPatternDataModel = NullPatternDataModel()
+
+
+class HelpWindow(QtWidgets.QMainWindow):
+    def __init__(self, help_text, parent=None):
+        super().__init__(parent=parent)
+
+        self.setWindowFlag(QtCore.Qt.WindowType.Tool)
+        self.setWindowTitle("Help")
+        self.setGeometry(100, 100, 400, 300)
+
+        self.text_edit = QtWidgets.QTextEdit()
+        self.text_edit.setReadOnly(True)
+        self.setCentralWidget(self.text_edit)
+
+        self.display_help(help_text)
+
+    def display_help(self, help_text):
+        self.text_edit.setMarkdown(help_text)
 
 
 class PatternViewer(QtWidgets.QMainWindow):
@@ -170,7 +253,7 @@ class PatternViewer(QtWidgets.QMainWindow):
             self.currentImageChangedFunc(self)
 
     @property
-    def currentDataset(self) -> PatternDataModel:
+    def currentDataset(self) -> PatternDataModelBase:
         return self.datasets.get(self.currentDatasetName, nullPatternDataModel)
 
     @property
@@ -223,8 +306,14 @@ class PatternViewer(QtWidgets.QMainWindow):
         hbox.addWidget(self.patternSlider)
         hbox.addWidget(self.dataset2Box)
         grid.addWidget(self.datasetGroup, 2, 0, 1, 1)
+        self.setCentralWidget(QtWidgets.QWidget(parent=self))
+        self.centralWidget().setLayout(grid)
+        self._initImageControlWindow()
+        self._initMenuBar()
 
-        self.imageGroup = QtWidgets.QGroupBox("Image")
+    def _initImageControlWindow(self):
+        self.imageControlWindow = QtWidgets.QWidget()
+        self.imageControlWindow.setWindowFlag(QtCore.Qt.WindowType.Tool)
         igLayout = QtWidgets.QGridLayout()
         self.rotationSlider = QtWidgets.QSlider(
             QtCore.Qt.Orientation.Horizontal, parent=self
@@ -241,13 +330,18 @@ class PatternViewer(QtWidgets.QMainWindow):
         igLayout.addWidget(QtWidgets.QLabel("rotation"), 0, 0)
         igLayout.addWidget(self.rotationSlider, 0, 1, 1, 3)
 
+        self.flipCheckBox = QtWidgets.QCheckBox("flip")
+        self.flipCheckBox.stateChanged.connect(
+            lambda state: self.setImage(self._currentImage)
+        )
         self.symmetrizeCheckBox = QtWidgets.QCheckBox("symmetrize")
         self.symmetrizeCheckBox.stateChanged.connect(
             lambda a: self.currentDataset.setSymmetrize(
                 self.symmetrizeCheckBox.isChecked()
             )
         )
-        igLayout.addWidget(self.symmetrizeCheckBox, 1, 2)
+        igLayout.addWidget(self.flipCheckBox, 3, 2)
+        igLayout.addWidget(self.symmetrizeCheckBox, 3, 1)
 
         self.applyMaskCheckBox = QtWidgets.QCheckBox("apply mask")
         self.applyMaskCheckBox.stateChanged.connect(
@@ -255,7 +349,17 @@ class PatternViewer(QtWidgets.QMainWindow):
                 self.applyMaskCheckBox.isChecked()
             )
         )
-        igLayout.addWidget(self.applyMaskCheckBox, 1, 3)
+        igLayout.addWidget(self.applyMaskCheckBox, 3, 3)
+
+        self.showCircleCheckBox = QtWidgets.QCheckBox("circle")
+        self.cicrleROI = pg.CircleROI((-10, -10), 20)
+        self.cicrleROI.hide()
+        self.imageViewer.view.addItem(self.cicrleROI)
+        self.showCircleCheckBox.stateChanged.connect(
+            lambda s:  self.cicrleROI.show() if self.showCircleCheckBox.isChecked() else self.cicrleROI.hide()
+        )
+        igLayout.addWidget(QtWidgets.QLabel("tools"), 4, 0)
+        igLayout.addWidget(self.showCircleCheckBox, 4, 1)
 
         self.colormapBox = QtWidgets.QComboBox(parent=self)
         self.colormapBox.addItems(plt.colormaps())
@@ -267,12 +371,18 @@ class PatternViewer(QtWidgets.QMainWindow):
         igLayout.addWidget(QtWidgets.QLabel("colormap"), 1, 0)
         igLayout.addWidget(self.colormapBox, 1, 1)
 
-        self.imageGroup.setLayout(igLayout)
-        grid.addWidget(self.imageGroup, 3, 0)
+        self.applyImageFuncBox = QtWidgets.QLineEdit(parent=self.imageControlWindow)
+        self.applyImageFuncBox.setPlaceholderText("np.log(x)")
+        self.applyImageFuncBox.returnPressed.connect(
+            lambda: self.setImage(self._currentImage)
+        )
+        igLayout.addWidget(QtWidgets.QLabel("apply"), 2, 0)
+        igLayout.addWidget(self.applyImageFuncBox, 2, 1, 1, 3)
 
-        self.setCentralWidget(QtWidgets.QWidget(parent=self))
-        self.centralWidget().setLayout(grid)
+        self.imageControlWindow.setLayout(igLayout)
+        # self.imageControlWindow.show()
 
+    def _initMenuBar(self):
         self.menuBar = self.menuBar()
         self.menuBar.setNativeMenuBar(False)
         fileMenu = self.menuBar.addMenu("&File")
@@ -284,6 +394,15 @@ class PatternViewer(QtWidgets.QMainWindow):
         analysisMenu = self.menuBar.addMenu("&Analysis")
         angularStatisticAction = analysisMenu.addAction("Angular statistic")
         angularStatisticAction.triggered.connect(self._angularStatistic)
+        viewMenu = self.menuBar.addMenu("&View")
+        imageMenu = viewMenu.addAction("&Image")
+        imageMenu.triggered.connect(self.imageControlWindow.show)
+        getHelpAction = viewMenu.addAction("&Help")
+        getHelpAction.triggered.connect(self.showHelp)
+
+    def showHelp(self):
+        help_window = HelpWindow(__doc__, parent=self)
+        help_window.show()
 
     def _save_patterns_only_emc(self, fileName: Path):
         ds = self.currentDataset
@@ -364,7 +483,7 @@ class PatternViewer(QtWidgets.QMainWindow):
         if needUpdate:
             self._setCurrentDataset(name)
 
-    def removeDataset(self, name=None):
+    def deleteDataset(self, name=None):
         if name is None:
             name = self.currentDatasetName
         if name not in self.datasets:
@@ -379,6 +498,18 @@ class PatternViewer(QtWidgets.QMainWindow):
             self._setCurrentDataset("")
         elif name == self.currentDatasetName:
             self._setCurrentDataset(next(self.datasets.keys()))
+
+    def addDataset(self, name):
+        if name in self.datasets:
+            raise Exception("exists")
+        self.currentDatasetBox.addItem(name)
+        self.dataset2Box.addItem(name)
+        self.datasets[name] = PatternDataModel(
+            self.currentDataset.patterns,
+            detector=self.currentDataset.detector,
+            initIndex=None,
+            selectedList=[],
+        )
 
     def switchDatasets(self):
         t = self._dataset2Name
@@ -437,6 +568,15 @@ class PatternViewer(QtWidgets.QMainWindow):
         self.rotationChanged.emit(r)
         self._protectRotation = False
 
+    def _getSetImageArgs(self):
+        if self._imageInitialized:
+            return dict()
+        return dict(
+            autoRange=False,
+            autoHistogramRange=False,
+            autoLevels=False,
+        )
+
     def setImage(self, img: Optional[np.ndarray]):
         s = self.currentDataset.patterns[self.currentDataset.rawIndex].sum()
         self.infoLabel.update(
@@ -455,21 +595,21 @@ class PatternViewer(QtWidgets.QMainWindow):
         y0, y1, x0, x1 = self.currentDataset.detectorRender.frame_extent()
         tr = QtGui.QTransform()
         tr.rotate(self.rotation)
-        tr.scale((x1 - x0) / sx, (y1 - y0) / sy)
+        if self.flipCheckBox.isChecked():
+            tr.scale((x0 - x1) / sx, (y1 - y0) / sy)
+        else:
+            tr.scale((x1 - x0) / sx, (y1 - y0) / sy)
         tr.translate(x0 - 0.5, y0 - 0.5)
         self._transform = tr
         self._transformInverted = tr.inverted()[0]
-        if self._imageInitialized:
-            self.imageViewer.setImage(img, transform=tr)
-            self._imageInitialized = False
+        f = self.applyImageFuncBox.text()
+        if f == "":
+            img = img
         else:
-            self.imageViewer.setImage(
-                img,
-                transform=tr,
-                autoRange=False,
-                autoHistogramRange=False,
-                autoLevels=False,
-            )
+            with np.errstate(all="ignore"):
+                img = eval(f"lambda x: {f}")(img)
+        self.imageViewer.setImage(img, transform=tr, **self._getSetImageArgs())
+        self._imageInitialized = False
         self.currentImageChanged.emit(self)
 
 
@@ -483,7 +623,7 @@ def patternViewer(src, detector=None):
         datasets = {"(default)": PatternDataModel(pattern, detector=det, modify=False)}
     else:
         datasets = {
-            k: v if isinstance(v, PatternDataModel) else PatternDataModel(**v)
+            k: v if isinstance(v, PatternDataModelBase) else PatternDataModel(**v)
             for k, v in src.items()
         }
 

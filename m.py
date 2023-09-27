@@ -6,11 +6,13 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets
 from rich.logging import RichHandler
 
-from spiviewer.pattern_viewer import PatternDataModel, patternViewer
+from spiviewer import PatternDataModel, patternViewer, ImageDataModel
+from spiviewer import pg_helper
 
 logging.basicConfig(
     level=logging.DEBUG, format="%(asctime)s %(message)s", handlers=[RichHandler()]
 )
+
 
 
 def fake_detector(s, detd, beamstop):
@@ -51,25 +53,22 @@ pd = PatternDataModel(patterns, detector=det, modify=False)
 w = patternViewer(
     {
         "(default)": pd,
-        "a": PatternDataModel(patterns, detector=det, selectedList=np.arange(11)),
+        "images": ImageDataModel(np.random.rand(10, 5, 10), None),
+        "empty": PatternDataModel(
+            patterns, detector=det, initIndex=None, selectedList=np.arange(0)
+        ),
     }
 )
 # w = patternViewer("/u/szsdk/NeoEMC/data/photons.emc", "/u/szsdk/NeoEMC/data/det_sim.dat")
+p = pg.EllipseROI([0, 0], [10, 10], pen="r")
+w.imageViewer.view.addItem(p)
 
 w.currentImageChangedFunc = lambda x: x.infoLabel.update(
     {"doubled index": 2 * x.currentDataset.rawIndex}
 )
-w.show()
 
-# btn = QtWidgets.QPushButton("ff")
-# btn.clicked.connect(
-#     # lambda: w.removeDataset("a")
-#     lambda: w.setDataset("b", PatternDataModel(
-#             patterns,
-#             detector=det,
-#             selectedList=np.arange(11, 30)
-#         ))
-# )
-# btn.show()
+
+w.imageViewer.scene.exportDialog = pg_helper.ROIExporterDialog(w.imageViewer.scene)
+w.show()
 
 pg.exec()

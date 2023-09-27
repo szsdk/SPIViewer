@@ -7,22 +7,14 @@ import numpy as np
 from pyqtgraph.Qt import QtCore
 
 
-def _symmetrizedDetr(det, symmetrize):
-    if not symmetrize:
-        return ef.det_render(det)
-    det_sym = deepcopy(det)
-    det_sym.coor *= np.array([-1, -1, 1])
-    return ef.det_render(np.concatenate([det, det_sym]))
-
-
-class PatternDataModel(QtCore.QObject):
+class PatternDataModelBase(QtCore.QObject):
     selected = QtCore.pyqtSignal(int)
     selectedListChanged = QtCore.pyqtSignal()
 
     def __init__(
         self,
         patterns,
-        detector=None,
+        detector,
         initIndex=0,
         selectedList=None,
         symmetrize=False,
@@ -33,8 +25,8 @@ class PatternDataModel(QtCore.QObject):
         self._initialized = False
         self.patterns = patterns
         self.detector = detector
-        self.detectorRender = None
         self.symmetrize = False
+        self._detectorRender = None
         self._cache = cachetools.LRUCache(maxsize=32)
         self._index = initIndex
         self.modify = modify
@@ -55,10 +47,12 @@ class PatternDataModel(QtCore.QObject):
         if self.symmetrize == symmetrize and self._initialized:
             return
         self.symmetrize = symmetrize
-        if self.detector is not None:
-            self.detectorRender = _symmetrizedDetr(self.detector, symmetrize)
         self._cache.clear()
         self.select(self.index)
+
+    @property
+    def detectorRender(self):
+        raise NotImplementedError()
 
     def setSelectedList(self, selectedList):
         if not self.modify:
@@ -103,8 +97,8 @@ class PatternDataModel(QtCore.QObject):
     def select(self, index: int):
         if self._protectIndex:
             return
-        self._index = index
-        if self.index is not None:
+        self._index = None if index == -1 else index
+        if self.index is not None and self.index < len(self.selectedList):
             self.selectByRawIndex(int(self.selectedList[self.index]))
 
     def selectByRawIndex(self, rawIndex):
@@ -114,36 +108,85 @@ class PatternDataModel(QtCore.QObject):
         self._protectIndex = False
 
     def selectNext(self, d: int = 1):
-        self.select((self.index + d) % len(self))
+        if self.index is not None:
+            self.select((self.index + d) % len(self))
 
     def selectPrevious(self, d: int = 1):
-        self.select((self.index - d) % len(self))
+        if self.index is not None:
+            self.select((self.index - d) % len(self))
 
     def selectRandomly(self):
-        self.select(np.random.choice(len(self)))
+        if self.index is not None:
+            self.select(np.random.choice(len(self)))
 
     def getSelection(self):
         return self.getImage(self.rawIndex)
 
+    def symmetrizeImage(self, img):
+        raise NotImplementedError()
+
     @cachetools.cachedmethod(operator.attrgetter("_cache"))
     def getImage(self, index):
-        img = self.patterns[index]
-        if not self.symmetrize:
-            if self.detectorRender is None:
-                ans = img
-            else:
-                ans = self.detectorRender.render(img)
-        else:
-            if self.detectorRender is None:
-                ans = (img + img[::-1, ::-1]) / 2
-            else:
-                ans = self.detectorRender.render(np.concatenate([img] * 2)) / 2
+        ans = self.detectorRender.render(
+            self.symmetrizeImage(self.patterns[index])
+        )
         if self.applyMask and hasattr(ans, "mask"):
             ans[ans.mask] = np.nan
         return ans
 
     def __len__(self):
         return len(self.selectedList)
+
+
+class PatternDataModel(PatternDataModelBase):
+    def symmetrizeImage(self, img):
+        if not self.symmetrize:
+            return img
+        return np.concatenate([img] * 2) / 2
+
+    @property
+    def detectorRender(self):
+        if (self._detectorRender is not None) and\
+           (self._detectorRender._symmtrize == self.symmetrize) and\
+           (self._detectorRender._originalDetector is self.detector):
+            return self._detectorRender
+
+        if not self.symmetrize:
+            self._detectorRender = ef.det_render(self.detector)
+        else:
+            det_sym = deepcopy(self.detector)
+            det_sym.coor *= np.array([-1, -1, 1])
+            self._detectorRender = ef.det_render(np.concatenate([self.detector, det_sym]))
+        self._detectorRender._symmtrize = self.symmetrize
+        self._detectorRender._originalDetector = self.detector
+        return self._detectorRender
+
+
+class _PlainDetector:
+    def __init__(self, shape):
+        w = (shape[1]-1) / 2.
+        h = (shape[0]-1) / 2.
+        self._frame_extent = (-w, w, -h, h)
+
+    def render(self, img):
+        return img
+
+    def frame_extent(self):
+        return self._frame_extent
+
+
+class ImageDataModel(PatternDataModelBase):
+    def symmetrizeImage(self, img):
+        if not self.symmetrize:
+            return img
+        return (img + img[::-1, ::-1]) / 2
+
+    @property
+    def detectorRender(self):
+        if self._detectorRender is None:
+            self._detectorRender = _PlainDetector(self.patterns.shape[1:])
+        return self._detectorRender
+
 
 
 class NullPatternDataModel(QtCore.QObject):
