@@ -27,7 +27,14 @@ def fake_detector(s, detd, beamstop):
     factor = np.ones(xy.shape[0])
     mask = np.zeros_like(factor, int)
     mask[r < beamstop] = 2
-    return ef.detector(coor=coor, factor=factor, mask=mask, detd=detd, ewald_rad=detd)
+    return ef.detector(
+        coor=coor,
+        factor=factor,
+        mask=mask,
+        detd=detd,
+        ewald_rad=detd,
+        check_consistency=False,
+    )
 
 
 det = fake_detector(64, 150, 4)
