@@ -29,7 +29,14 @@ def fake_detector(s, detd, beamstop):
     factor = np.ones(xy.shape[0])
     mask = np.zeros_like(factor, int)
     mask[r < beamstop] = 2
-    return ef.detector(coor=coor, factor=factor, mask=mask, detd=detd, ewald_rad=detd)
+    return ef.detector(
+        coor=coor,
+        factor=factor,
+        mask=mask,
+        detd=detd,
+        ewald_rad=detd,
+        check_consistency=False,
+    )
 
 
 det = fake_detector(64, 150, 4)
@@ -53,6 +60,8 @@ w = patternViewer(
     }
 )
 # w = patternViewer("/u/szsdk/NeoEMC/data/photons.emc", "/u/szsdk/NeoEMC/data/det_sim.dat")
+p = pg.EllipseROI([0, 0], [10, 10], pen="r")
+w.imageViewer.view.addItem(p)
 
 w.currentImageChangedFunc = lambda x: x.infoLabel.update(
     {"doubled index": 2 * x.currentDataset.rawIndex}

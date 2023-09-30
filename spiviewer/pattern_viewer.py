@@ -1,20 +1,24 @@
+import logging
 import os
 import subprocess
-import logging
+import tempfile
 from pathlib import Path
 from typing import Optional
-import tempfile
 
 import emcfile as ef
 import matplotlib.pyplot as plt
 import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
-from pyqtgraph.Qt.QtWidgets import QMessageBox, QInputDialog
+from pyqtgraph.Qt.QtWidgets import QInputDialog, QMessageBox
 
 from . import utils
 from ._angular_statistic_viewer import AngularStatisticViewer
-from ._pattern_data_model import NullPatternDataModel, PatternDataModelBase, PatternDataModel
+from ._pattern_data_model import (
+    NullPatternDataModel,
+    PatternDataModel,
+    PatternDataModelBase,
+)
 
 __all__ = [
     "PatternViewer",
@@ -221,6 +225,49 @@ class HelpWindow(QtWidgets.QMainWindow):
         self.text_edit.setMarkdown(help_text)
 
 
+class CentralCrossROI(pg.ROI):
+    def __init__(self, **args):
+        # for i, p in enumerate(positions):
+        #     self.addFreeHandle(p, item=handles[i])
+        #
+        line0 = pg.LineSegmentROI([(0, 5), (10, 5)], movable=False)
+        for handler in line0.handles:
+            handler["item"].hide()
+        line1 = pg.LineSegmentROI([(5, 0), (5, 10)], movable=False)
+        for handler in line1.handles:
+            handler["item"].hide()
+        self.line0 = line0
+        self.line1 = line1
+        pg.ROI.__init__(self, [-5, -5], [10, 10], **args)
+
+    def getState(self):
+        return {
+            "line0": self.line0.getState(),
+            "line1": self.line1.getState(),
+        }
+        # raise NotImplementedError()
+
+    def saveState(self):
+        return {
+            "line0": self.line0.saveState(),
+            "line1": self.line1.saveState(),
+        }
+
+    def setState(self, state):
+        # raise NotImplementedError()
+        self.line0.setState(state["line0"])
+        self.line1.setState(state["line1"])
+
+    def paint(self, p, *args):
+        self.line0.paint(p)
+        self.line1.paint(p)
+
+    # def hide(self):
+    #     self.line0.hide()
+    #     self.line1.hide()
+    #     super().hide()
+
+
 class PatternViewer(QtWidgets.QMainWindow):
     rotationChanged = QtCore.pyqtSignal(int)
     currentImageChanged = QtCore.pyqtSignal(object)
@@ -356,10 +403,23 @@ class PatternViewer(QtWidgets.QMainWindow):
         self.cicrleROI.hide()
         self.imageViewer.view.addItem(self.cicrleROI)
         self.showCircleCheckBox.stateChanged.connect(
-            lambda s:  self.cicrleROI.show() if self.showCircleCheckBox.isChecked() else self.cicrleROI.hide()
+            lambda s: self.cicrleROI.show()
+            if self.showCircleCheckBox.isChecked()
+            else self.cicrleROI.hide()
         )
         igLayout.addWidget(QtWidgets.QLabel("tools"), 4, 0)
         igLayout.addWidget(self.showCircleCheckBox, 4, 1)
+
+        self.showCrossCheckBox = QtWidgets.QCheckBox("cross")
+        self.crossROI = CentralCrossROI()
+        self.crossROI.hide()
+        self.imageViewer.view.addItem(self.crossROI)
+        self.showCrossCheckBox.stateChanged.connect(
+            lambda s: self.crossROI.show()
+            if self.showCrossCheckBox.isChecked()
+            else self.crossROI.hide()
+        )
+        igLayout.addWidget(self.showCrossCheckBox, 4, 2)
 
         self.colormapBox = QtWidgets.QComboBox(parent=self)
         self.colormapBox.addItems(plt.colormaps())

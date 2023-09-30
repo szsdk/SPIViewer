@@ -50,6 +50,12 @@ class PatternDataModelBase(QtCore.QObject):
         self._cache.clear()
         self.select(self.index)
 
+    def setDetector(self, detector):
+        self.detector = detector
+        self._detectorRender = None
+        self._cache.clear()
+        self.select(self.index)
+
     @property
     def detectorRender(self):
         raise NotImplementedError()
