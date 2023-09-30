@@ -44,14 +44,12 @@ class ROIExporter(Exporter):
             self.fileSaveDialog(filter=["*.h5", "*.hdf", "*.hd5"])
             return
         if isinstance(self.item, pg.PolyLineROI):
+            # print(self.item.getState())
+            state = self.item.saveState()
+            for k in ["points", "pos", "size"]:
+                state[k] = np.array(state[k])
             ef.write_obj_h5(
-                f"{fileName}::{self.params['Name']}",
-                {
-                    "closed": self.item.closed,
-                    "points": np.array(
-                        [tuple(p) for p in self.item.getState()["points"]]
-                    ),
-                },
+                f"{fileName}::{self.params['Name']}", state,
                 overwrite=True,
             )
         elif isinstance(self.item, pg.CircleROI):
