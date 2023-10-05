@@ -6,13 +6,11 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets
 from rich.logging import RichHandler
 
-from spiviewer import PatternDataModel, patternViewer, ImageDataModel
-from spiviewer import pg_helper
+from spiviewer import ImageDataModel, PatternDataModel, patternViewer, pg_helper
 
 logging.basicConfig(
     level=logging.DEBUG, format="%(asctime)s %(message)s", handlers=[RichHandler()]
 )
-
 
 
 def fake_detector(s, detd, beamstop):

@@ -39,7 +39,7 @@ def _get_rs(detector, mask: Optional[List[int]]):
 
 
 AngBinnedStatisticResult = namedtuple(
-    "AngBinnedStatisticResult", ("statistic", "bin_edges", "binnumber")
+    "AngBinnedStatisticResult", ("statistic", "bin_edges", "binnumber", "radius")
 )
 
 
@@ -66,10 +66,10 @@ def _axis1_ang_binned_statistic(patterns, rs, pix_idx, bins=10, statistic="mean"
         r = np.asarray(r.todense())
         binnumber = _get_binnumber(rsp, bin_edges)
         if statistic == "sum":
-            return AngBinnedStatisticResult(r, bin_edges, binnumber)
+            return AngBinnedStatisticResult(r, bin_edges, binnumber, rs)
         else:
             return AngBinnedStatisticResult(
-                r / np.bincount(col - 1, weights=pix_idx), bin_edges, binnumber
+                r / np.bincount(col - 1, weights=pix_idx), bin_edges, binnumber, rs
             )
     elif isinstance(patterns, np.ndarray):
         raise NotImplementedError()
@@ -83,15 +83,15 @@ def ang_binned_statistic(
     bins=10,
     statistic="mean",
 ):
-    if statistic not in ["sum", "mean"]:
-        raise ValueError("statistic can only be 'sum' or 'mean'")
+    if statistic not in ["sum", "mean", "min", "max"]:
+        raise ValueError("statistic can only be 'sum' | 'mean' | 'min' | 'max'")
     rs, pix_idx = _get_rs(detector, mask)
     if axis is None:
         img = _to_1darray(patterns, len(rs))
         ans = binned_statistic(
             rs[pix_idx], img[pix_idx], bins=bins, statistic=statistic
         )
-        return AngBinnedStatisticResult(*ans)
+        return AngBinnedStatisticResult(*ans, rs)
     elif axis == 1:
         return _axis1_ang_binned_statistic(
             patterns, rs, pix_idx, bins=bins, statistic=statistic

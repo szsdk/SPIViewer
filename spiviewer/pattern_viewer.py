@@ -2,6 +2,7 @@ import logging
 import os
 import subprocess
 import tempfile
+from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
@@ -13,6 +14,7 @@ from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from pyqtgraph.Qt.QtWidgets import QInputDialog, QMessageBox
 
 from . import utils
+from ._ang_binned_statistic import ang_binned_statistic
 from ._angular_statistic_viewer import AngularStatisticViewer
 from ._pattern_data_model import (
     NullPatternDataModel,
@@ -49,6 +51,10 @@ __doc__ = """
 - `esc`: reset focus
 - `esc`×2: exit
 - `?`: show help
+
+## pre-defined functions:
+- `ang_stat(img, bins=50, statistic="min", mask=[ef.PixelType.BAD])`:
+    Calculate the angular statistic of an image.
 """
 
 
@@ -268,6 +274,32 @@ class CentralCrossROI(pg.ROI):
     #     super().hide()
 
 
+@lru_cache
+def _radius_from_shape(shape):
+    coor = np.meshgrid(
+        np.arange(shape[0]),
+        np.arange(shape[1]),
+        indexing="ij",
+    )
+    return np.linalg.norm([coor[i] - shape[i] / 2.0 for i in range(2)], axis=0).ravel()
+
+
+def ang_stat(img, bins=50, statistic="min", mask=[ef.PixelType.BAD]):
+    """
+    Calculate the angular statistic of an image.
+    """
+    a = ang_binned_statistic(
+        img,
+        _radius_from_shape(img.shape),
+        # self.currentDataset.detector,
+        bins=bins,
+        statistic=statistic,
+    )
+    return np.interp(
+        a.radius, (a.bin_edges[:-1] + a.bin_edges[1:]) / 2, a.statistic
+    ).reshape(img.shape)
+
+
 class PatternViewer(QtWidgets.QMainWindow):
     rotationChanged = QtCore.pyqtSignal(int)
     currentImageChanged = QtCore.pyqtSignal(object)
@@ -432,7 +464,7 @@ class PatternViewer(QtWidgets.QMainWindow):
         igLayout.addWidget(self.colormapBox, 1, 1)
 
         self.applyImageFuncBox = QtWidgets.QLineEdit(parent=self.imageControlWindow)
-        self.applyImageFuncBox.setPlaceholderText("np.log(x)")
+        self.applyImageFuncBox.setPlaceholderText("np.log(x); ang_stat(x)")
         self.applyImageFuncBox.returnPressed.connect(
             lambda: self.setImage(self._currentImage)
         )
@@ -667,7 +699,7 @@ class PatternViewer(QtWidgets.QMainWindow):
             img = img
         else:
             with np.errstate(all="ignore"):
-                img = eval(f"lambda x: {f}")(img)
+                img = eval(f"lambda x: {f}", {"ang_stat": ang_stat})(img)
         self.imageViewer.setImage(img, transform=tr, **self._getSetImageArgs())
         self._imageInitialized = False
         self.currentImageChanged.emit(self)

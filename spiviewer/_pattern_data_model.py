@@ -1,5 +1,5 @@
-from copy import deepcopy
 import operator
+from copy import deepcopy
 
 import cachetools
 import emcfile as ef
@@ -133,9 +133,7 @@ class PatternDataModelBase(QtCore.QObject):
 
     @cachetools.cachedmethod(operator.attrgetter("_cache"))
     def getImage(self, index):
-        ans = self.detectorRender.render(
-            self.symmetrizeImage(self.patterns[index])
-        )
+        ans = self.detectorRender.render(self.symmetrizeImage(self.patterns[index]))
         if self.applyMask and hasattr(ans, "mask"):
             ans[ans.mask] = np.nan
         return ans
@@ -152,9 +150,11 @@ class PatternDataModel(PatternDataModelBase):
 
     @property
     def detectorRender(self):
-        if (self._detectorRender is not None) and\
-           (self._detectorRender._symmtrize == self.symmetrize) and\
-           (self._detectorRender._originalDetector is self.detector):
+        if (
+            (self._detectorRender is not None)
+            and (self._detectorRender._symmtrize == self.symmetrize)
+            and (self._detectorRender._originalDetector is self.detector)
+        ):
             return self._detectorRender
 
         if not self.symmetrize:
@@ -162,7 +162,9 @@ class PatternDataModel(PatternDataModelBase):
         else:
             det_sym = deepcopy(self.detector)
             det_sym.coor *= np.array([-1, -1, 1])
-            self._detectorRender = ef.det_render(np.concatenate([self.detector, det_sym]))
+            self._detectorRender = ef.det_render(
+                np.concatenate([self.detector, det_sym])
+            )
         self._detectorRender._symmtrize = self.symmetrize
         self._detectorRender._originalDetector = self.detector
         return self._detectorRender
@@ -170,8 +172,8 @@ class PatternDataModel(PatternDataModelBase):
 
 class _PlainDetector:
     def __init__(self, shape):
-        w = (shape[1]-1) / 2.
-        h = (shape[0]-1) / 2.
+        w = (shape[1] - 1) / 2.0
+        h = (shape[0] - 1) / 2.0
         self._frame_extent = (-w, w, -h, h)
 
     def render(self, img):
@@ -182,6 +184,9 @@ class _PlainDetector:
 
 
 class ImageDataModel(PatternDataModelBase):
+    def __init__(self, patterns, detector=None, *args, **kargs):
+        super().__init__(patterns, detector, *args, **kargs)
+
     def symmetrizeImage(self, img):
         if not self.symmetrize:
             return img
@@ -192,7 +197,6 @@ class ImageDataModel(PatternDataModelBase):
         if self._detectorRender is None:
             self._detectorRender = _PlainDetector(self.patterns.shape[1:])
         return self._detectorRender
-
 
 
 class NullPatternDataModel(QtCore.QObject):
