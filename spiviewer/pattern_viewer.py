@@ -294,6 +294,7 @@ class PatternViewer(QtWidgets.QMainWindow):
         # This is a shortcut function which would be called whenever the image is changed.
         # It could be modified directly. Setting it to `None` avoids the calling.
         self.currentImageChanged.connect(self._callCurrentImageChangedFunc)
+        self.menus = dict()
 
     def _callCurrentImageChangedFunc(self):
         if self.currentImageChangedFunc is not None:
@@ -440,7 +441,6 @@ class PatternViewer(QtWidgets.QMainWindow):
         igLayout.addWidget(self.applyImageFuncBox, 2, 1, 1, 3)
 
         self.imageControlWindow.setLayout(igLayout)
-        # self.imageControlWindow.show()
 
     def _initMenuBar(self):
         self.menuBar = self.menuBar()
@@ -459,6 +459,10 @@ class PatternViewer(QtWidgets.QMainWindow):
         imageMenu.triggered.connect(self.imageControlWindow.show)
         getHelpAction = viewMenu.addAction("&Help")
         getHelpAction.triggered.connect(self.showHelp)
+
+        self.menus["file"] = fileMenu
+        self.menus["view"] = viewMenu
+        self.menus["analysis"] = analysisMenu
 
     def showHelp(self):
         help_window = HelpWindow(__doc__, parent=self)
