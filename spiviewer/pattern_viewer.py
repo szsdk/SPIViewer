@@ -312,6 +312,7 @@ class PatternViewer(QtWidgets.QMainWindow):
         self._transform = None
         self._transformInverted = None
         self._currentImage = None
+        self.menus = dict()
         self.initUI()
         self._currentDatasetName = self.currentDatasetBox.currentText()
         self._dataset2Name = self.dataset2Box.currentText()
@@ -326,7 +327,6 @@ class PatternViewer(QtWidgets.QMainWindow):
         # This is a shortcut function which would be called whenever the image is changed.
         # It could be modified directly. Setting it to `None` avoids the calling.
         self.currentImageChanged.connect(self._callCurrentImageChangedFunc)
-        self.menus = dict()
 
     def _callCurrentImageChangedFunc(self):
         if self.currentImageChangedFunc is not None:
