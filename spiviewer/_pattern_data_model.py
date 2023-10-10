@@ -184,6 +184,9 @@ class _PlainDetector:
 
 
 class ImageDataModel(PatternDataModelBase):
+    def __init__(self, patterns, detector=None, *args, **kargs):
+        super().__init__(patterns, detector, *args, **kargs)
+
     def symmetrizeImage(self, img):
         if not self.symmetrize:
             return img
