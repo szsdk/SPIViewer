@@ -503,7 +503,6 @@ class PatternViewer(QtWidgets.QMainWindow):
         viewMenu = self.menuBar.addMenu("&View")
         imageMenu = viewMenu.addAction("&Image")
         imageMenu.triggered.connect(self.imageControlWindow.show)
-        viewMenu = self.menuBar.addMenu("&View")
         helpAction = self.menuBar.addAction("&Help")
         helpAction.triggered.connect(self.showHelp)
 
