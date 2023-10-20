@@ -83,8 +83,8 @@ def ang_binned_statistic(
     bins=10,
     statistic="mean",
 ):
-    if statistic not in ["sum", "mean", "min", "max"]:
-        raise ValueError("statistic can only be 'sum' | 'mean' | 'min' | 'max'")
+    # if statistic not in ["sum", "mean", "min", "max"]:
+    #     raise ValueError("statistic can only be 'sum' | 'mean' | 'min' | 'max'")
     rs, pix_idx = _get_rs(detector, mask)
     if axis is None:
         img = _to_1darray(patterns, len(rs))
