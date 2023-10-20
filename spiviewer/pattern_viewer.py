@@ -201,11 +201,21 @@ class PatternViewerShortcuts:
                 pv, "Text Input Dialog", "Enter your name:"
             )
             if ok:
-                pv.addDataset(newDatasetName)
+                pv.addDataset(
+                    newDatasetName,
+                    PatternDataModel(
+                        pv.currentDataset.patterns,
+                        detector=pv.currentDataset.detector,
+                        initIndex=None,
+                        selectedList=[],
+                    ),
+                )
         elif text == "?":
             pv.showHelp()
         elif text in self._custom:
             self._custom[text]()
+        elif key in self._custom:
+            self._custom[key]()
         else:
             event.ignore()
 
@@ -284,20 +294,21 @@ def _radius_from_shape(shape):
     return np.linalg.norm([coor[i] - shape[i] / 2.0 for i in range(2)], axis=0).ravel()
 
 
-def ang_stat(img, bins=50, statistic="min", mask=[ef.PixelType.BAD]):
+def ang_stat(img, bins=50, statistic="min", mask=[ef.PixelType.BAD], fill_nan=0):
     """
     Calculate the angular statistic of an image.
     """
     a = ang_binned_statistic(
         img,
         _radius_from_shape(img.shape),
-        # self.currentDataset.detector,
         bins=bins,
         statistic=statistic,
     )
-    return np.interp(
-        a.radius, (a.bin_edges[:-1] + a.bin_edges[1:]) / 2, a.statistic
-    ).reshape(img.shape)
+    s = a.statistic
+    s[np.isnan(s)] = fill_nan
+    return np.interp(a.radius, (a.bin_edges[:-1] + a.bin_edges[1:]) / 2, s).reshape(
+        img.shape
+    )
 
 
 class PatternViewer(QtWidgets.QMainWindow):
@@ -464,13 +475,22 @@ class PatternViewer(QtWidgets.QMainWindow):
         igLayout.addWidget(QtWidgets.QLabel("colormap"), 1, 0)
         igLayout.addWidget(self.colormapBox, 1, 1)
 
-        self.applyImageFuncBox = QtWidgets.QLineEdit(parent=self.imageControlWindow)
-        self.applyImageFuncBox.setPlaceholderText("np.log(x); ang_stat(x)")
+        # self.applyImageFuncBox = QtWidgets.QLineEdit(parent=self.imageControlWindow)
+        self.applyImageFuncBox = QtWidgets.QLineEdit()
+        # self.applyImageFuncBox.setPlaceholderText("np.log(x); ang_stat(x)")
         self.applyImageFuncBox.returnPressed.connect(
             lambda: self.setImage(self._currentImage)
         )
+        self.applyImageFuncComboBox = QtWidgets.QComboBox(self.imageControlWindow)
+        self.applyImageFuncComboBox.addItems(
+            ["x", "x ** 0.2", "np.log(x)", "x-ang_stat(x, statistic=np.nanmean)"]
+        )
+        self.applyImageFuncComboBox.setLineEdit(self.applyImageFuncBox)
+        self.applyImageFuncComboBox.currentTextChanged.connect(
+            lambda: self.setImage(self._currentImage)
+        )
         igLayout.addWidget(QtWidgets.QLabel("apply"), 2, 0)
-        igLayout.addWidget(self.applyImageFuncBox, 2, 1, 1, 3)
+        igLayout.addWidget(self.applyImageFuncComboBox, 2, 1, 1, 3)
 
         self.imageControlWindow.setLayout(igLayout)
 
@@ -483,9 +503,13 @@ class PatternViewer(QtWidgets.QMainWindow):
         saveAction = fileMenu.addAction("&Save")
         saveAction.triggered.connect(self._save)
         saveAction.setShortcut("Ctrl+S")
+
         analysisMenu = self.menuBar.addMenu("&Analysis")
         angularStatisticAction = analysisMenu.addAction("Angular statistic")
         angularStatisticAction.triggered.connect(self._angularStatistic)
+        addSumDatasetAction = analysisMenu.addAction("Sum current dataset")
+        addSumDatasetAction.triggered.connect(self._addSumDataset)
+
         viewMenu = self.menuBar.addMenu("&View")
         imageMenu = viewMenu.addAction("&Image")
         imageMenu.triggered.connect(self.imageControlWindow.show)
@@ -544,6 +568,18 @@ class PatternViewer(QtWidgets.QMainWindow):
         self.angularStatisticViewer.show()
         self.currentImageChanged.emit(self)
 
+    def _addSumDataset(self):
+        patterns = (
+            self.currentDataset.patterns[:].sum(axis=0).reshape(1, -1)
+            / self.currentDataset.detector.factor
+            * self.currentDataset.detector.factor.mean()
+        )
+        ds = "sum:" + self.currentDatasetName
+        self.addDataset(
+            ds, type(self.currentDataset)(patterns, self.currentDataset.detector)
+        )
+        self._setCurrentDataset(ds)
+
     def mouseMovedEvent(self, pos):
         if self._currentImage is None:
             return
@@ -595,17 +631,12 @@ class PatternViewer(QtWidgets.QMainWindow):
         elif name == self.currentDatasetName:
             self._setCurrentDataset(next(self.datasets.keys()))
 
-    def addDataset(self, name):
+    def addDataset(self, name, dataset):
         if name in self.datasets:
             raise Exception("exists")
         self.currentDatasetBox.addItem(name)
         self.dataset2Box.addItem(name)
-        self.datasets[name] = PatternDataModel(
-            self.currentDataset.patterns,
-            detector=self.currentDataset.detector,
-            initIndex=None,
-            selectedList=[],
-        )
+        self.datasets[name] = dataset
 
     def switchDatasets(self):
         t = self._dataset2Name
@@ -703,7 +734,7 @@ class PatternViewer(QtWidgets.QMainWindow):
             img = img
         else:
             with np.errstate(all="ignore"):
-                img = eval(f"lambda x: {f}", {"ang_stat": ang_stat})(img)
+                img = eval(f"lambda x: {f}", {"ang_stat": ang_stat, "np": np})(img)
         self.imageViewer.setImage(img, transform=tr, **self._getSetImageArgs())
         self._imageInitialized = False
         self.currentImageChanged.emit(self)
@@ -714,7 +745,7 @@ def patternViewer(src, detector=None):
         if isinstance(src, (ef.PatternsSOneEMC, ef.PatternsSOne)):
             pattern = src
         else:
-            pattern = ef.PatternsSOneEMC(src)
+            pattern = ef.file_patterns(src)
         det = ef.detector(detector)
         datasets = {"(default)": PatternDataModel(pattern, detector=det, modify=False)}
     else:
