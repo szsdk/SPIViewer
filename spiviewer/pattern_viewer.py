@@ -243,9 +243,6 @@ class HelpWindow(QtWidgets.QMainWindow):
 
 class CentralCrossROI(pg.ROI):
     def __init__(self, **args):
-        # for i, p in enumerate(positions):
-        #     self.addFreeHandle(p, item=handles[i])
-        #
         line0 = pg.LineSegmentROI([(0, 5), (10, 5)], movable=False)
         for handler in line0.handles:
             handler["item"].hide()
@@ -261,7 +258,6 @@ class CentralCrossROI(pg.ROI):
             "line0": self.line0.getState(),
             "line1": self.line1.getState(),
         }
-        # raise NotImplementedError()
 
     def saveState(self):
         return {
@@ -270,18 +266,12 @@ class CentralCrossROI(pg.ROI):
         }
 
     def setState(self, state):
-        # raise NotImplementedError()
         self.line0.setState(state["line0"])
         self.line1.setState(state["line1"])
 
     def paint(self, p, *args):
         self.line0.paint(p)
         self.line1.paint(p)
-
-    # def hide(self):
-    #     self.line0.hide()
-    #     self.line1.hide()
-    #     super().hide()
 
 
 @lru_cache
@@ -513,12 +503,14 @@ class PatternViewer(QtWidgets.QMainWindow):
         viewMenu = self.menuBar.addMenu("&View")
         imageMenu = viewMenu.addAction("&Image")
         imageMenu.triggered.connect(self.imageControlWindow.show)
-        getHelpAction = viewMenu.addAction("&Help")
-        getHelpAction.triggered.connect(self.showHelp)
+        viewMenu = self.menuBar.addMenu("&View")
+        helpAction = self.menuBar.addAction("&Help")
+        helpAction.triggered.connect(self.showHelp)
 
         self.menus["file"] = fileMenu
         self.menus["view"] = viewMenu
         self.menus["analysis"] = analysisMenu
+        self.menus["help"] = helpAction
 
     def showHelp(self):
         help_window = HelpWindow(__doc__, parent=self)
