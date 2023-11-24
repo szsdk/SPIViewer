@@ -113,7 +113,7 @@ class PatternDataModelBase(QtCore.QObject):
         self.selected.emit(self.index)
         self._protectIndex = False
 
-    def selertNext(self, d: int = 1):
+    def selectNext(self, d: int = 1):
         if self.index is not None:
             self.select((self.index + d) % len(self))
 
