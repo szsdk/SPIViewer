@@ -50,7 +50,7 @@ class PatternDataModelBase(QtCore.QObject):
         self._cache.clear()
         self.select(self.index)
 
-    def setDetertor(self, detector):
+    def setDetector(self, detector):
         self.detector = detector
         self._detectorRender = None
         self._cache.clear()
