@@ -222,6 +222,7 @@ class GeomRefiner(QtWidgets.QMainWindow):
             geom = roi.offset.apply(geom)
         det = geom2det(geom, self.detd_m, mask2=self._det0.mask == ef.PixelType.BAD)
         self._patternData.setDetector(det)
+        self.parent().setImage(self.parent().datasetsManager.dataset1.getSelection())
         detr = ef.det_render(det)
         p2d = detr.to_cxy(det.coor)[:, ::-1].reshape(4, -1, 2)
         posStr = ""

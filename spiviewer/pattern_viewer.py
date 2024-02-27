@@ -754,12 +754,6 @@ class PatternViewer(QtWidgets.QMainWindow):
             self.infoLabel.update({"position": None, "value": None})
 
     def _setCurrentDataset(self, sl: str):
-        # try:
-        #     self.currentDataset.selectedListChanged.disconnect()
-        #     self.currentDataset.selected.disconnect()
-        # except:
-        #     pass
-        # self._currentDatasetName = sl
         self.updatePatternRange()
         currentDataset = self.datasetsManager.dataset1
         pidx = currentDataset.index
