@@ -102,28 +102,33 @@ class PatternDataModelBase(QtCore.QObject):
 
     def select(self, index: int):
         if self._protectIndex:
-            return
+            return self.index
         self._index = None if index == -1 else index
         if self.index is not None and self.index < len(self.selectedList):
             self.selectByRawIndex(int(self.selectedList[self.index]))
+        return self.index
 
     def selectByRawIndex(self, rawIndex):
         self._rawIndex = rawIndex
         self._protectIndex = True
         self.selected.emit(self.index)
         self._protectIndex = False
+        return self.index
 
     def selectNext(self, d: int = 1):
         if self.index is not None:
             self.select((self.index + d) % len(self))
+        return self.index
 
     def selectPrevious(self, d: int = 1):
         if self.index is not None:
             self.select((self.index - d) % len(self))
+        return self.index
 
     def selectRandomly(self):
         if self.index is not None:
             self.select(np.random.choice(len(self)))
+        return self.index
 
     def getSelection(self):
         return self.getImage(self.rawIndex)
@@ -133,6 +138,8 @@ class PatternDataModelBase(QtCore.QObject):
 
     @cachetools.cachedmethod(operator.attrgetter("_cache"))
     def getImage(self, index):
+        if self.rawIndex is None:
+            return None
         ans = self.detectorRender.render(self.symmetrizeImage(self.patterns[index]))
         if self.applyMask and hasattr(ans, "mask"):
             ans[ans.mask] = np.nan
@@ -200,6 +207,9 @@ class ImageDataModel(PatternDataModelBase):
 
 
 class NullPatternDataModel(QtCore.QObject):
+    selected = QtCore.pyqtSignal(int)
+    selectedListChanged = QtCore.pyqtSignal()
+
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         self.patterns = np.full((1, 1), np.nan)

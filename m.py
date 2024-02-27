@@ -6,7 +6,8 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets
 from rich.logging import RichHandler
 
-from spiviewer import ImageDataModel, PatternDataModel, patternViewer, pg_helper
+from spiviewer import ImageDataModel, PatternDataModel, patternViewer
+from spiviewer.plugins import ROIExporterDialog
 
 logging.basicConfig(
     level=logging.DEBUG, format="%(asctime)s %(message)s", handlers=[RichHandler()]
@@ -62,11 +63,11 @@ p = pg.EllipseROI([0, 0], [10, 10], pen="r")
 w.imageViewer.view.addItem(p)
 
 w.currentImageChangedFunc = lambda x: x.infoLabel.update(
-    {"doubled index": 2 * x.currentDataset.rawIndex}
+    {"doubled index": 2 * x.datasetsManager.dataset1.rawIndex}
 )
 
 
-w.imageViewer.scene.exportDialog = pg_helper.ROIExporterDialog(w.imageViewer.scene)
+w.imageViewer.scene.exportDialog = ROIExporterDialog(w.imageViewer.scene)
 w.show()
 
 pg.exec()
