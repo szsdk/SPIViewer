@@ -107,6 +107,10 @@ class PatternViewerShortcuts:
     def register(self, k, f):
         self._custom[k] = f
 
+    def unregister(self, k):
+        if k in self._custom:
+            del self._custom[k]
+
     def keyPressEvent(self, event, pv: "PatternViewer"):
         event.accept()
         key = event.key()
