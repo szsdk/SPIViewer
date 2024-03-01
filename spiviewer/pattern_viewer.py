@@ -504,9 +504,8 @@ class PatternViewer(QtWidgets.QMainWindow):
             lambda idx: self.patternSlider.setValue(idx)
         )
         self.datasetsManager.selected.connect(
-            lambda idx: self.setImage(self.datasetsManager.dataset1.getSelection())
+            lambda idx: self.setImage(self.datasetsManager.dataset1.getSelectedImage())
         )
-        # currentDataset.selectedListChanged.connect(self.updatePatternRange)
         self.datasetsManager.selectedListChanged.connect(self.updatePatternRange)
 
         self.datasetGroup = QtWidgets.QGroupBox("Index")
@@ -558,7 +557,7 @@ class PatternViewer(QtWidgets.QMainWindow):
         self.rotationSlider.valueChanged.connect(self.setRotation)
         self.rotationChanged.connect(self.rotationSlider.setValue)
         self.rotationChanged.connect(
-            lambda r: self.setImage(self.datasetsManager.dataset1.getSelection())
+            lambda r: self.setImage(self.datasetsManager.dataset1.getSelectedImage())
         )
 
         igLayout.addWidget(QtWidgets.QLabel("rotation"), 0, 0)
@@ -800,7 +799,7 @@ class PatternViewer(QtWidgets.QMainWindow):
         )
 
     def updateImage(self):
-        self.setImage(self.datasetsManager.dataset1.getSelection())
+        self.setImage(self.datasetsManager.dataset1.getSelectedImage())
 
     def setImage(self, img: Optional[np.ndarray]):
         if img is None:

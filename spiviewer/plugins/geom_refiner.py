@@ -5,6 +5,7 @@ import extra_geom
 import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
+from scipy.stats import binned_statistic_2d
 
 from .._pattern_data_model import PatternDataModelBase
 
@@ -21,6 +22,50 @@ class _GeomRender:
         img, c = self.geom.position_modules(data.reshape(self.geom.expected_data_shape))
         w, h = img.shape
         self._frame_extent = (-c[1], -c[1] + h, -c[0], -c[0] + w)
+        return img
+
+
+class _GeomAngularRender:
+    def __init__(self, geom: extra_geom.base.DetectorGeometryBase, bins=180):
+        self.geom = geom
+        self.bins = 180
+        self._position2D = (
+            geom.data_coords_to_positions(
+                *np.mgrid[
+                    : geom.expected_data_shape[0],
+                    : geom.expected_data_shape[1],
+                    : geom.expected_data_shape[2],
+                ]
+            ).reshape(-1, 3)[:, :2]
+            / geom.pixel_size
+        ).T
+        self._positionPolar = np.array(
+            [
+                np.arctan2(self._position2D[1], self._position2D[0]),
+                np.linalg.norm(self._position2D, axis=0),
+            ]
+        )
+        self.render(np.zeros(self.geom.expected_data_shape))
+
+    def frame_extent(self):
+        return self._frame_extent
+
+    def render(self, data):
+        ret = binned_statistic_2d(
+            self._positionPolar[0],
+            self._positionPolar[1],
+            data.ravel(),
+            bins=self.bins,
+            statistic="sum",
+        )
+        self._frame_extent = (
+            ret.x_edge[0],
+            ret.x_edge[-1],
+            ret.y_edge[0],
+            ret.y_edge[-1],
+        )
+        img = ret.statistic
+        img /= img.mean(axis=0)
         return img
 
 
@@ -182,8 +227,13 @@ class GeomRefiner(QtWidgets.QMainWindow):
         button_layout = QtWidgets.QHBoxLayout()
         button_layout.addWidget(exportGeomButton)
 
+        self.imageViewer = pg.ImageView()
+        viewer_layout = QtWidgets.QHBoxLayout()
+        viewer_layout.addWidget(self.imageViewer)
+
         layout.addLayout(input_layout)
         layout.addLayout(button_layout)
+        layout.addLayout(viewer_layout)
 
         central_widget.setLayout(layout)
         self.setCentralWidget(central_widget)
@@ -193,8 +243,19 @@ class GeomRefiner(QtWidgets.QMainWindow):
         geom = self.parent().datasetsManager.dataset1.detector
         for mi, roi in enumerate(self._moduleROIs):
             geom = roi.offset.apply(geom)
+        # self.imageViewer.setImage(np.random.rand(4, 5))
+        self.imageViewer.setImage(
+            self.parent().datasetsManager.dataset1.getSelectedImage(
+                render=_GeomAngularRender(geom)
+            ),
+            autoRange=False,
+            autoHistogramRange=False,
+            autoLevels=False,
+        )
         self.parent().datasetsManager.dataset1.setDetector(geom)
-        self.parent().setImage(self.parent().datasetsManager.dataset1.getSelection())
+        self.parent().setImage(
+            self.parent().datasetsManager.dataset1.getSelectedImage()
+        )
         nm, ns, nf = geom.expected_data_shape
         p2d = (
             geom.data_coords_to_positions(

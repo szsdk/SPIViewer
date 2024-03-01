@@ -130,17 +130,19 @@ class PatternDataModelBase(QtCore.QObject):
             self.select(np.random.choice(len(self)))
         return self.index
 
-    def getSelection(self):
-        return self.getImage(self.rawIndex)
+    def getSelectedImage(self, render=None):
+        return self.getImage(self.rawIndex, render)
 
     def symmetrizeImage(self, img):
         raise NotImplementedError()
 
     @cachetools.cachedmethod(operator.attrgetter("_cache"))
-    def getImage(self, index):
+    def getImage(self, index, render=None):
         if self.rawIndex is None:
             return None
-        ans = self.detectorRender.render(self.symmetrizeImage(self.patterns[index]))
+        if render is None:
+            render = self.detectorRender
+        ans = render.render(self.symmetrizeImage(self.patterns[index]))
         if self.applyMask and hasattr(ans, "mask"):
             ans[ans.mask] = np.nan
         return ans
@@ -218,7 +220,7 @@ class NullPatternDataModel(QtCore.QObject):
         self.symmetrize = False
         self.applyMask = False
 
-    def getSelection(self):
+    def getSelectedImage(self):
         return None
 
     def __len__(self):
