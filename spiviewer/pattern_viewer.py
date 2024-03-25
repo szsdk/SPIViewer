@@ -409,6 +409,15 @@ class DatasetsManager(QtCore.QObject):
         self.selected.emit(self.dataset1.selectRandomly())
 
 
+def _setPatternIndex(idx, pv):
+    pv.patternIndexSpinBox.blockSignals(True)
+    pv.patternSlider.blockSignals(True)
+    pv.patternIndexSpinBox.setValue(idx)
+    pv.patternSlider.setValue(idx)
+    pv.patternIndexSpinBox.blockSignals(False)
+    pv.patternSlider.blockSignals(False)
+
+
 class PatternViewer(QtWidgets.QMainWindow):
     rotationChanged = QtCore.pyqtSignal(int)
     currentImageChanged = QtCore.pyqtSignal(object)
@@ -497,15 +506,8 @@ class PatternViewer(QtWidgets.QMainWindow):
         )
         grid.addWidget(self.imageViewer, 1, 0, 1, 2)
 
-        self.datasetsManager.selected.connect(
-            lambda idx: self.patternIndexSpinBox.setValue(idx)
-        )
-        self.datasetsManager.selected.connect(
-            lambda idx: self.patternSlider.setValue(idx)
-        )
-        self.datasetsManager.selected.connect(
-            lambda idx: self.setImage(self.datasetsManager.dataset1.getSelectedImage())
-        )
+        self.datasetsManager.selected.connect(lambda idx: _setPatternIndex(idx, self))
+        self.datasetsManager.selected.connect(self.updateImage)
         self.datasetsManager.selectedListChanged.connect(self.updatePatternRange)
 
         self.datasetGroup = QtWidgets.QGroupBox("Index")
@@ -584,7 +586,6 @@ class PatternViewer(QtWidgets.QMainWindow):
             )
         )
         self.applyMaskCheckBox.stateChanged.connect(self.updateImage)
-        self.datasetsManager.selected.connect(self.updateImage)
         igLayout.addWidget(self.applyMaskCheckBox, 3, 3)
 
         self.showCircleCheckBox = QtWidgets.QCheckBox("circle")
