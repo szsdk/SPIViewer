@@ -243,7 +243,6 @@ class GeomRefiner(QtWidgets.QMainWindow):
         geom = self.parent().datasetsManager.dataset1.detector
         for mi, roi in enumerate(self._moduleROIs):
             geom = roi.offset.apply(geom)
-        # self.imageViewer.setImage(np.random.rand(4, 5))
         self.imageViewer.setImage(
             self.parent().datasetsManager.dataset1.getSelectedImage(
                 render=_GeomAngularRender(geom)

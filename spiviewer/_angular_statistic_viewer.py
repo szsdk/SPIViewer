@@ -13,7 +13,7 @@ class AngularStatisticViewer(pg.PlotWidget):
         self.setLabel("bottom", "q/pixel")
 
     def updatePlot(self, pv):
-        dm = pv.currentDataset
+        dm = pv.datasetsManager.dataset1
         ans = ang_binned_statistic(
             dm.patterns[dm.rawIndex], dm.detector, bins=self.bins
         )

@@ -7,7 +7,7 @@ from pyqtgraph.Qt import QtWidgets
 from rich.logging import RichHandler
 
 from spiviewer import ImageDataModel, PatternDataModel, patternViewer
-from spiviewer.plugins import ROIExporterDialog
+from spiviewer.plugins import MultiCircleROI, ROIExporterDialog
 
 logging.basicConfig(
     level=logging.DEBUG, format="%(asctime)s %(message)s", handlers=[RichHandler()]
@@ -64,6 +64,16 @@ w.imageViewer.view.addItem(p)
 
 w.currentImageChangedFunc = lambda x: x.infoLabel.update(
     {"doubled index": 2 * x.datasetsManager.dataset1.rawIndex}
+)
+
+mc_roi = MultiCircleROI()
+w.imageViewer.view.addItem(mc_roi)
+
+w.currentImageChanged.connect(
+    lambda pv: (
+        # print(pv.datasetsManager.dataset1.rawIndex),
+        mc_roi.updatePeaks(np.random.rand(3, 2), np.array([0, 0, 1])),
+    )
 )
 
 
