@@ -1,3 +1,6 @@
+from typing import Union
+
+import numpy as np
 import pyqtgraph as pg
 
 
@@ -36,16 +39,22 @@ class MultiCircleROI(pg.ROI):
         self.circles.append(circle)
         return circle
 
-    def updatePeaks(self, peaks, peakColors):
+    def updateCircles(self, pos, peakColors, radius: Union[int, float] = 4):
         self.clearCircles()
-        if len(peaks) == 0:
+        if len(pos) == 0:
             return
         ncolor = max(0, peakColors.max() + 1)
-        # for c, color in zip(peaks - self.peakDiameter / 2, peakColors):
-        for c, color in zip(peaks - 2, peakColors):
+
+        if isinstance(radius, (int, float)):
+            rads = np.full(pos.shape[0], radius)
+        elif isinstance(radius, np.ndarray):
+            rads = radius
+        else:
+            raise RuntimeError("radius must be either a number or an array")
+        for c, r, color in zip(pos - rads[:, None], rads.ravel(), peakColors):
             circle = self.addCircle(
                 c,
-                2,
+                float(r),
                 pen="w" if color == -1 else pg.intColor(color, hues=ncolor),
                 movable=False,
                 rotatable=False,

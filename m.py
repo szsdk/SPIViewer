@@ -72,7 +72,7 @@ w.imageViewer.view.addItem(mc_roi)
 w.currentImageChanged.connect(
     lambda pv: (
         # print(pv.datasetsManager.dataset1.rawIndex),
-        mc_roi.updatePeaks(np.random.rand(3, 2), np.array([0, 0, 1])),
+        mc_roi.updateCircles(np.random.rand(3, 2), np.array([0, 0, 1])),
     )
 )
 
