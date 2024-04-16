@@ -39,11 +39,11 @@ class MultiCircleROI(pg.ROI):
         self.circles.append(circle)
         return circle
 
-    def updateCircles(self, pos, peakColors, radius: Union[int, float] = 4):
+    def updateCircles(self, pos, color, radius: Union[int, float] = 4):
         self.clearCircles()
         if len(pos) == 0:
             return
-        ncolor = max(0, peakColors.max() + 1)
+        ncolor = max(0, color.max() + 1)
 
         if isinstance(radius, (int, float)):
             rads = np.full(pos.shape[0], radius)
@@ -51,10 +51,10 @@ class MultiCircleROI(pg.ROI):
             rads = radius
         else:
             raise RuntimeError("radius must be either a number or an array")
-        for c, r, color in zip(pos - rads[:, None], rads.ravel(), peakColors):
+        for c, r, color in zip(pos - rads[:, None], rads.ravel(), color):
             circle = self.addCircle(
                 c,
-                float(r),
+                float(r) * 2,
                 pen="w" if color == -1 else pg.intColor(color, hues=ncolor),
                 movable=False,
                 rotatable=False,
