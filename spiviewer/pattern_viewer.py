@@ -409,11 +409,29 @@ class DatasetsManager(QtCore.QObject):
         self.selected.emit(self.dataset1.selectRandomly())
 
 
+class _ColorbarManager:
+    def __init__(self, imageViewer, name):
+        self.imageViewer = imageViewer
+        self._currentDataset = name
+        self._data = dict()
+
+    def update(self, name):
+        self._data[self._currentDataset] = {
+            "levels": self.imageViewer.ui.histogram.getLevels(),
+            # "range": self.imageViewer.ui.histogram.getHistogramRange(),
+        }
+        self._currentDataset = name
+        if name in self._data:
+            data = self._data[name]
+            self.imageViewer.ui.histogram.setLevels(*data["levels"])
+            # self.imageViewer.ui.histogram.setHistogramRange(data["range"])
+
+
 class PatternViewer(QtWidgets.QMainWindow):
     rotationChanged = QtCore.pyqtSignal(int)
     currentImageChanged = QtCore.pyqtSignal(object)
 
-    def __init__(self, datasets, parent=None):
+    def __init__(self, datasets, separateColorbar: bool = False, parent=None):
         super().__init__(parent=parent)
         self._rotation = 0
         self._protectRotation = False
@@ -443,6 +461,12 @@ class PatternViewer(QtWidgets.QMainWindow):
         # This is a shortcut function which would be called whenever the image is changed.
         # It could be modified directly. Setting it to `None` avoids the calling.
         self.currentImageChanged.connect(self._callCurrentImageChangedFunc)
+
+        self._colorbarManager = _ColorbarManager(
+            self.imageViewer, self.datasetsManager.nameOfDataset1
+        )
+        if separateColorbar:
+            self.datasetsManager.dataset1Changed.connect(self._colorbarManager.update)
 
     def datasetsChanged(self, datasetNames):
         self.currentDatasetBox.currentTextChanged.disconnect(
@@ -597,15 +621,7 @@ class PatternViewer(QtWidgets.QMainWindow):
         )
         igLayout.addWidget(self.showCrossCheckBox, 4, 2)
 
-        self.colormapBox = QtWidgets.QComboBox(parent=self)
-        self.colormapBox.addItems(plt.colormaps())
-        self.colormapBox.currentTextChanged.connect(
-            lambda cm: self.imageViewer.setColorMap(pg.colormap.getFromMatplotlib(cm))
-        )
-        self.colormapBox.setCurrentText("magma")
-        self.colormapBox.currentTextChanged.emit("magma")
-        igLayout.addWidget(QtWidgets.QLabel("colormap"), 1, 0)
-        igLayout.addWidget(self.colormapBox, 1, 1)
+        self.imageViewer.setColorMap(pg.colormap.getFromMatplotlib("magma"))
 
         # self.applyImageFuncBox = QtWidgets.QLineEdit(parent=self.imageControlWindow)
         self.applyImageFuncBox = QtWidgets.QLineEdit()
