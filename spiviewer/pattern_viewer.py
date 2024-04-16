@@ -409,15 +409,6 @@ class DatasetsManager(QtCore.QObject):
         self.selected.emit(self.dataset1.selectRandomly())
 
 
-def _setPatternIndex(idx, pv):
-    pv.patternIndexSpinBox.blockSignals(True)
-    pv.patternSlider.blockSignals(True)
-    pv.patternIndexSpinBox.setValue(idx)
-    pv.patternSlider.setValue(idx)
-    pv.patternIndexSpinBox.blockSignals(False)
-    pv.patternSlider.blockSignals(False)
-
-
 class PatternViewer(QtWidgets.QMainWindow):
     rotationChanged = QtCore.pyqtSignal(int)
     currentImageChanged = QtCore.pyqtSignal(object)
@@ -443,7 +434,6 @@ class PatternViewer(QtWidgets.QMainWindow):
         self.datasetsManager.setDataset1ByName(self.currentDatasetBox.currentText())
         self.datasetsManager.setDataset2ByName(self.dataset2Box.currentText())
         if len(self.datasetsManager.datasets) > 0:
-            # self._setCurrentDataset(self.currentDatasetBox.currentText())
             self.datasetsManager.setDataset1ByName(self.currentDatasetBox.currentText())
             self.setRotation(self.rotation)
         self.shortcuts = PatternViewerShortcuts()
@@ -506,7 +496,7 @@ class PatternViewer(QtWidgets.QMainWindow):
         )
         grid.addWidget(self.imageViewer, 1, 0, 1, 2)
 
-        self.datasetsManager.selected.connect(lambda idx: _setPatternIndex(idx, self))
+        self.datasetsManager.selected.connect(self._setPatternIndex)
         self.datasetsManager.selected.connect(self.updateImage)
         self.datasetsManager.selectedListChanged.connect(self.updatePatternRange)
 
@@ -523,12 +513,8 @@ class PatternViewer(QtWidgets.QMainWindow):
         self.currentDatasetBox.currentTextChanged.connect(
             self.datasetsManager.setDataset1ByName
         )
-        self.patternIndexSpinBox.valueChanged.connect(
-            lambda v: self.datasetsManager.select(v)
-        )
-        self.patternSlider.valueChanged.connect(
-            lambda v: self.datasetsManager.select(v)
-        )
+        self.patternIndexSpinBox.valueChanged.connect(self.datasetsManager.select)
+        self.patternSlider.valueChanged.connect(self.datasetsManager.select)
 
         self.dataset2Box = QtWidgets.QComboBox(parent=self)
         self.dataset2Box.addItems(self.datasetsManager.datasets.keys())
@@ -759,7 +745,9 @@ class PatternViewer(QtWidgets.QMainWindow):
 
     def _setCurrentDataset(self, sl: str):
         self.updatePatternRange()
+
         currentDataset = self.datasetsManager.dataset1
+        self._setPatternIndex(currentDataset.index)
         pidx = currentDataset.index
         self.symmetrizeCheckBox.setChecked(currentDataset.symmetrize)
         self.applyMaskCheckBox.setChecked(currentDataset.applyMask)
@@ -772,11 +760,31 @@ class PatternViewer(QtWidgets.QMainWindow):
 
     def updatePatternRange(self):
         numData = len(self.datasetsManager.dataset1)
+        self.patternIndexSpinBox.blockSignals(True)
+        self.patternSlider.blockSignals(True)
+
         self.patternIndexSpinBox.setRange(0, numData - 1)
         self.patternSlider.setMinimum(0)
         self.patternSlider.setMaximum(numData - 1)
         self.patternNumberLabel.setText(f"/{numData}")
-        self.patternSlider.setValue(0)
+
+        self.patternIndexSpinBox.blockSignals(False)
+        self.patternSlider.blockSignals(False)
+
+    def _setPatternIndex(self, idx):
+        self.patternIndexSpinBox.blockSignals(True)
+        self.patternSlider.blockSignals(True)
+        if idx is None:
+            self.patternIndexSpinBox.setEnabled(False)
+            self.patternSlider.setEnabled(False)
+            self.patternIndexSpinBox.setValue(0)
+        else:
+            self.patternIndexSpinBox.setEnabled(True)
+            self.patternSlider.setEnabled(True)
+            self.patternIndexSpinBox.setValue(idx)
+            self.patternSlider.setValue(idx)
+        self.patternIndexSpinBox.blockSignals(False)
+        self.patternSlider.blockSignals(False)
 
     @property
     def rotation(self):
