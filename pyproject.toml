@@ -1,0 +1,25 @@
+[project]
+name = "spiviewer"
+version = "0.1.0"
+description = ""
+readme = "README.md"
+authors = [
+    { name = "Shen Zhou", email = "shen34206@hotmail.com" }
+]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "emcfile",
+    "extra-geom>=1.12.0",
+    "pyqtgraph>=0.13.7",
+    "pyqt5>=5.15.11",
+    "cachetools>=5.5.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv.sources]
+emcfile = { git = "https://github.com/szsdk/emcfile" }
+
